@@ -2,173 +2,61 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>KetsuRyu</title>
   <style>
-    :root {
-      --c-cyan:  #2be2fe;
-      --c-white: #ffffff;
-      --c-gold:  #ffd86b;
-      --c-red:   #ff3a4c;
-      --c-bg:    #050505;
-    }
     html, body {
       margin: 0; padding: 0;
       width: 100%; height: 100%;
       overflow: hidden;
-      background: var(--c-bg);
-      color: var(--c-white);
-      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-      touch-action: none;
+      background: #050a0c;
+      font-family: ui-serif, Georgia, "Times New Roman", serif;
+      color: #d8c8a8;
+      cursor: none;
     }
     canvas { display: block; }
 
-    /* HUD */
-    #hud {
-      position: fixed; inset: 0;
-      pointer-events: none;
-      z-index: 10;
-    }
-    .hud-top {
-      position: absolute; top: 14px; left: 0; right: 0;
-      display: flex; justify-content: space-between;
-      padding: 0 18px;
-      font-size: 13px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      text-shadow: 0 0 12px rgba(43,226,254,0.6);
-    }
-    .hud-top .label { opacity: 0.65; font-size: 10px; margin-bottom: 2px; }
-    .hud-top .value { font-size: 22px; font-weight: 700; }
-    .hud-top .value.warn { color: var(--c-red); text-shadow: 0 0 12px rgba(255,58,76,0.7); }
-
-    .hud-bonus {
-      position: absolute;
-      top: 50%; left: 50%; transform: translate(-50%, -120%);
-      font-size: 22px; letter-spacing: 0.24em; text-transform: uppercase;
-      font-weight: 700;
-      opacity: 0;
-      transition: opacity 0.2s;
-      text-shadow: 0 0 18px currentColor;
-    }
-    .hud-bonus.show { opacity: 1; transform: translate(-50%, -200%); transition: transform 0.6s ease-out, opacity 0.6s; }
-
-    /* Reticle */
-    #reticle {
+    #title {
       position: fixed;
-      width: 26px; height: 26px;
-      border: 1.5px solid rgba(255,255,255,0.35);
+      left: 50%; bottom: 26px;
+      transform: translateX(-50%);
+      letter-spacing: 0.5em;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: rgba(216, 200, 168, 0.55);
+      text-shadow: 0 0 12px rgba(255, 120, 60, 0.25);
+      pointer-events: none;
+      user-select: none;
+      z-index: 5;
+    }
+
+    #cursor {
+      position: fixed;
+      width: 14px; height: 14px;
+      border: 1px solid rgba(255, 200, 160, 0.7);
       border-radius: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      z-index: 9;
       mix-blend-mode: screen;
-      transition: opacity 0.2s;
-      opacity: 0;
+      z-index: 9;
+      transition: transform 0.08s ease-out;
     }
-    #reticle::before {
-      content: ""; position: absolute; inset: 9px;
-      background: var(--c-cyan); border-radius: 50%;
-      box-shadow: 0 0 14px var(--c-cyan);
+    #cursor::before {
+      content: ""; position: absolute; inset: 5px;
+      background: #ffb074; border-radius: 50%;
+      box-shadow: 0 0 14px #ff7a3c;
     }
-
-    /* Overlay screens */
-    .overlay {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      background: radial-gradient(ellipse at center, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.92) 80%);
-      z-index: 20;
-      text-align: center;
-      gap: 22px;
-      padding: 24px;
-      transition: opacity 0.35s ease;
-    }
-    .overlay.hidden { opacity: 0; pointer-events: none; }
-    .overlay .title {
-      font-size: clamp(40px, 9vw, 88px);
-      letter-spacing: 0.1em;
-      font-weight: 800;
-      text-transform: uppercase;
-      color: var(--c-cyan);
-      text-shadow:
-        0 0 24px rgba(43,226,254,0.9),
-        0 0 48px rgba(43,226,254,0.4);
-      margin: 0;
-    }
-    .overlay .subtitle {
-      font-size: clamp(13px, 2.4vw, 16px);
-      letter-spacing: 0.32em;
-      text-transform: uppercase;
-      opacity: 0.7;
-      margin: 0;
-      max-width: 540px;
-      line-height: 1.7;
-    }
-    .overlay .cta {
-      pointer-events: auto;
-      cursor: pointer;
-      padding: 14px 40px;
-      border: 1.5px solid var(--c-cyan);
-      color: var(--c-white);
-      background: transparent;
-      font: inherit;
-      font-size: 13px;
-      letter-spacing: 0.32em;
-      text-transform: uppercase;
-      box-shadow: 0 0 24px rgba(43,226,254,0.4), inset 0 0 24px rgba(43,226,254,0.08);
-      transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
-    }
-    .overlay .cta:hover { background: rgba(43,226,254,0.1); box-shadow: 0 0 32px rgba(43,226,254,0.7); transform: translateY(-1px); }
-    .overlay .cta:active { transform: translateY(1px); }
-
-    .stat-row { display: flex; gap: 36px; flex-wrap: wrap; justify-content: center; }
-    .stat { display: flex; flex-direction: column; gap: 4px; }
-    .stat .lbl { font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.55; }
-    .stat .val { font-size: clamp(32px, 6vw, 48px); font-weight: 800; color: var(--c-white); text-shadow: 0 0 16px rgba(255,255,255,0.4); }
-    .stat .val.gold { color: var(--c-gold); text-shadow: 0 0 16px rgba(255,216,107,0.5); }
   </style>
 </head>
 <body>
-  <div id="reticle"></div>
-
-  <div id="hud">
-    <div class="hud-top">
-      <div>
-        <div class="label">Score</div>
-        <div class="value" id="score">0</div>
-      </div>
-      <div style="text-align:right">
-        <div class="label">Time</div>
-        <div class="value" id="timer">30.0</div>
-      </div>
-    </div>
-    <div class="hud-bonus" id="bonus"></div>
-  </div>
-
-  <div class="overlay" id="overlay-start">
-    <h1 class="title">KetsuRyu</h1>
-    <p class="subtitle">Pilot the celestial dragon · Catch lanterns · Hunt the phoenix · Survive</p>
-    <button class="cta" id="btn-start">Tap to start</button>
-    <p class="subtitle" style="opacity:0.4">ZQSD / Arrow keys · Click &amp; drag · Touch &amp; drag</p>
-  </div>
-
-  <div class="overlay hidden" id="overlay-end">
-    <h1 class="title" style="color:var(--c-red); text-shadow: 0 0 24px rgba(255,58,76,0.9), 0 0 48px rgba(255,58,76,0.4);">Time Up</h1>
-    <div class="stat-row">
-      <div class="stat"><div class="lbl">Score</div><div class="val" id="end-score">0</div></div>
-      <div class="stat"><div class="lbl">Best</div><div class="val gold" id="end-best">0</div></div>
-    </div>
-    <button class="cta" id="btn-restart">Tap to restart</button>
-  </div>
+  <div id="cursor"></div>
+  <div id="title">Ketsu &middot; Ryu</div>
 
   <script type="importmap">
   {
     "imports": {
-      "three":          "https://unpkg.com/three@0.161.0/build/three.module.js",
-      "three/addons/":  "https://unpkg.com/three@0.161.0/examples/jsm/"
+      "three":         "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
     }
   }
   </script>
@@ -181,92 +69,33 @@
     import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
 
     // ============================================================
-    //  CONFIG
+    //  Palette (sumi-e / irezumi reference)
     // ============================================================
-    const COLOR = {
-      BG:      0x050505,
-      CYAN:    0x2be2fe,
-      WHITE:   0xffffff,
-      GOLD:    0xffd86b,
-      RED:     0xff3a4c,
-      MAGENTA: 0xff5fb1,
-      VIOLET:  0x4a2c8a,
-      DEEP:    0x0e1130,
-    };
-
-    const CFG = {
-      DRAGON: {
-        SEGMENTS: 70,
-        SEG_DIST: 0.55,
-        BASE_SPEED: 16,
-        MAX_SPEED:  44,
-        SPEED_RAMP: 0.012,   // per score point added
-        LATERAL_SPEED: 22,   // keyboard / drag XY speed
-        BASE_Y:    4,
-        CORRIDOR_X: 18,
-        CORRIDOR_Y: 11,
-      },
-      LANTERN: {
-        POOL: 26,
-        SPAWN_AHEAD: { min: 55, max: 110 },
-        SPREAD: 22,
-        VALUE: 10,
-        BONUS_TIME: 1.8,
-        RADIUS: 1.6,
-      },
-      PHOENIX: {
-        VALUE: 100,
-        BONUS_TIME: 5,
-        RADIUS: 2.2,
-        SPAWN_INTERVAL: { min: 9, max: 16 },
-      },
-      GAME: {
-        START_TIME: 30,
-        MAX_TIME:   60,
-      },
-    };
-
-    const STORAGE_BEST = 'ketsuryu_best';
-
-    // ============================================================
-    //  STATE
-    // ============================================================
-    const state = {
-      mode:    'menu',     // 'menu' | 'play' | 'over'
-      score:   0,
-      timeLeft: CFG.GAME.START_TIME,
-      best:    Number(localStorage.getItem(STORAGE_BEST) || 0),
-      pointer: { x: 0, y: 0, down: false },
-      target:  { x: 0, y: CFG.DRAGON.BASE_Y },
-      keys:    { up: false, down: false, left: false, right: false },
-      speed:   CFG.DRAGON.BASE_SPEED,
+    const COL = {
+      INK_DEEP:    0x06121a,
+      TEAL_DARK:   0x0e2a2c,
+      TEAL_MID:    0x1a4344,
+      TEAL_LIGHT:  0x355e5c,
+      MOON:        0xfff0c8,
+      DRAGON_BODY: 0x16110d,
+      DRAGON_BELLY:0x9c8662,
+      RIM_FIRE:    0xff5e2c,
+      MANE_HOT:    0xff8a3a,
+      MANE_GOLD:   0xffc674,
+      PETAL_LIGHT: 0xffc7d8,
+      PETAL_DEEP:  0xff8aaa,
+      EYE_GLOW:    0xffe89a,
     };
 
     // ============================================================
-    //  DOM
-    // ============================================================
-    const dom = {
-      reticle:  document.getElementById('reticle'),
-      score:    document.getElementById('score'),
-      timer:    document.getElementById('timer'),
-      bonus:    document.getElementById('bonus'),
-      start:    document.getElementById('overlay-start'),
-      end:      document.getElementById('overlay-end'),
-      endScore: document.getElementById('end-score'),
-      endBest:  document.getElementById('end-best'),
-      btnStart: document.getElementById('btn-start'),
-      btnRestart: document.getElementById('btn-restart'),
-    };
-
-    // ============================================================
-    //  RENDERER / SCENE / CAMERA
+    //  Scene / Renderer / Camera
     // ============================================================
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(COLOR.BG);
-    scene.fog = new THREE.Fog(0x2a1a4a, 60, 180);
+    scene.fog = new THREE.FogExp2(0x0a1c1e, 0.012);
 
-    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 600);
-    camera.position.set(0, 4, 18);
+    const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 400);
+    camera.position.set(0, 2, 38);
+    camera.lookAt(0, 2, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -276,826 +105,533 @@
     document.body.appendChild(renderer.domElement);
 
     // ============================================================
-    //  SKYBOX (Shenmue dusk gradient)
+    //  Background — gradient sky + soft moon + god rays (full-screen shader)
     // ============================================================
-    {
-      const skyGeo = new THREE.SphereGeometry(420, 32, 16);
-      const skyMat = new THREE.ShaderMaterial({
-        side: THREE.BackSide,
-        depthWrite: false,
-        uniforms: {
-          uTop:    { value: new THREE.Color(0x1f4dff) },
-          uMid:    { value: new THREE.Color(0xff6aa8) },
-          uBottom: { value: new THREE.Color(0x2a0e4a) },
-        },
-        vertexShader: /*glsl*/`
-          varying vec3 vWorld;
-          void main() {
-            vWorld = position;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: /*glsl*/`
-          varying vec3 vWorld;
-          uniform vec3 uTop, uMid, uBottom;
-          void main() {
-            float h = normalize(vWorld).y;
-            vec3 col = mix(uBottom, uMid, smoothstep(-0.4, 0.15, h));
-            col = mix(col, uTop, smoothstep(0.05, 0.65, h));
-            gl_FragColor = vec4(col, 1.0);
-          }
-        `,
+    const bgUniforms = {
+      uTime:       { value: 0 },
+      uMouse:      { value: new THREE.Vector2(0, 0) },
+      uResolution: { value: new THREE.Vector2(innerWidth, innerHeight) },
+    };
+    const bgMaterial = new THREE.ShaderMaterial({
+      uniforms: bgUniforms,
+      depthTest: false, depthWrite: false,
+      vertexShader: /*glsl*/`
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
+      `,
+      fragmentShader: /*glsl*/`
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec2  uMouse;
+
+        // Hash + value noise
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float vnoise(vec2 p){
+          vec2 i = floor(p), f = fract(p);
+          float a = hash(i), b = hash(i + vec2(1,0));
+          float c = hash(i + vec2(0,1)), d = hash(i + vec2(1,1));
+          vec2 u = f*f*(3.0-2.0*f);
+          return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+        }
+        float fbm(vec2 p){
+          float v = 0.0, a = 0.5;
+          for(int i=0; i<5; i++){ v += a*vnoise(p); p *= 2.03; a *= 0.5; }
+          return v;
+        }
+
+        void main() {
+          vec2 uv = vUv;
+          vec2 puv = uv + uMouse * 0.02;
+
+          // Vertical gradient: ink -> teal -> deeper
+          vec3 colDeep = vec3(0.020, 0.060, 0.075);
+          vec3 colMid  = vec3(0.060, 0.180, 0.190);
+          vec3 colTop  = vec3(0.030, 0.080, 0.110);
+          vec3 col = mix(colDeep, colMid, smoothstep(0.0, 0.55, uv.y));
+          col = mix(col, colTop, smoothstep(0.55, 1.0, uv.y));
+
+          // Soft moon (top right)
+          vec2 moonPos = vec2(0.80 - uMouse.x * 0.02, 0.74 - uMouse.y * 0.02);
+          float r = length((puv - moonPos) * vec2(1.0, 1.05));
+          float disc  = smoothstep(0.075, 0.062, r);
+          float halo  = exp(-r * 6.0) * 0.35;
+          float bigGl = exp(-r * 2.0) * 0.10;
+          col += vec3(1.00, 0.94, 0.78) * (disc * 0.9 + halo + bigGl);
+
+          // God rays from upper-right
+          vec2 rayOrig = vec2(0.78, 1.10);
+          vec2 d = puv - rayOrig;
+          float ang = atan(d.y, d.x);
+          float rays = 0.5 + 0.5 * sin(ang * 14.0 + uTime * 0.05);
+          rays *= smoothstep(0.0, 1.0, 1.0 - length(d));
+          rays *= smoothstep(-0.3, -1.4, d.y); // fade away from light source
+          col += vec3(1.0, 0.92, 0.72) * rays * 0.10;
+
+          // Atmospheric ink mist (slow FBM drift)
+          float mist = fbm(puv * 2.6 + vec2(uTime * 0.012, -uTime * 0.008));
+          mist = smoothstep(0.35, 0.85, mist);
+          col = mix(col, vec3(0.02, 0.07, 0.08), mist * 0.55);
+
+          // Subtle vignette
+          float v = smoothstep(1.2, 0.35, length(uv - 0.5));
+          col *= 0.55 + 0.45 * v;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    const bgQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMaterial);
+    bgQuad.frustumCulled = false;
+    bgQuad.renderOrder = -10;
+    scene.add(bgQuad);
+
+    // ============================================================
+    //  Distant mountain silhouettes (parallax layers)
+    // ============================================================
+    function makeMountainLayer({ z, color, peaks, height, opacity = 1 }) {
+      const w = 220;
+      const shape = new THREE.Shape();
+      shape.moveTo(-w/2, -20);
+      const step = w / peaks;
+      for (let i = 0; i <= peaks; i++) {
+        const x = -w/2 + i * step;
+        const noise = Math.sin(i * 1.3) * 0.3 + Math.sin(i * 0.7) * 0.5 + Math.cos(i * 2.1) * 0.2;
+        const h = height * (0.55 + noise * 0.45);
+        shape.lineTo(x, h);
+      }
+      shape.lineTo(w/2, -20);
+      shape.closePath();
+      const geo = new THREE.ShapeGeometry(shape, 1);
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent: opacity < 1, opacity, fog: true, depthWrite: false,
       });
-      scene.add(new THREE.Mesh(skyGeo, skyMat));
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.z = z;
+      mesh.position.y = -10;
+      return mesh;
     }
+    const mountainsFar  = makeMountainLayer({ z: -110, color: 0x142e30, peaks: 24, height: 24 });
+    const mountainsMid  = makeMountainLayer({ z:  -75, color: 0x0c2022, peaks: 18, height: 18 });
+    const mountainsNear = makeMountainLayer({ z:  -45, color: 0x06141a, peaks: 12, height: 12 });
+    scene.add(mountainsFar, mountainsMid, mountainsNear);
 
-    // ============================================================
-    //  LIGHTS
-    // ============================================================
-    scene.add(new THREE.AmbientLight(0x4a4070, 0.7));
-
-    const keyLight = new THREE.DirectionalLight(0xffd1b3, 1.1);
-    keyLight.position.set(20, 30, 10);
-    scene.add(keyLight);
-
-    const rimLight = new THREE.DirectionalLight(0x55c8ff, 0.7);
-    rimLight.position.set(-10, -5, -20);
-    scene.add(rimLight);
-
-    const headLight = new THREE.PointLight(COLOR.CYAN, 2.4, 35, 1.6);
-    scene.add(headLight);
-
-    // ============================================================
-    //  LOW-POLY CLOUDS (Shenmue distance fillers)
-    // ============================================================
-    const cloudGroup = new THREE.Group();
-    scene.add(cloudGroup);
+    // Ink mist puffs floating around
+    const mistGroup = new THREE.Group();
     {
-      const cloudGeo = new THREE.IcosahedronGeometry(1, 0);
-      const cloudMat1 = new THREE.MeshLambertMaterial({ color: 0xffd0e8, flatShading: true });
-      const cloudMat2 = new THREE.MeshLambertMaterial({ color: 0xa8c8ff, flatShading: true });
-      for (let i = 0; i < 80; i++) {
-        const m = new THREE.Mesh(cloudGeo, Math.random() < 0.5 ? cloudMat1 : cloudMat2);
-        const r = 100 + Math.random() * 180;
-        const a = Math.random() * Math.PI * 2;
-        const y = (Math.random() - 0.3) * 90;
-        m.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-        const s = 4 + Math.random() * 10;
-        m.scale.set(s * (1 + Math.random()), s * 0.55, s * (1 + Math.random()));
-        m.rotation.y = Math.random() * Math.PI;
-        cloudGroup.add(m);
+      const mistMat = new THREE.MeshBasicMaterial({
+        color: 0x07181a, transparent: true, opacity: 0.55, fog: true, depthWrite: false,
+      });
+      for (let i = 0; i < 14; i++) {
+        const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), mistMat);
+        m.position.set(
+          (Math.random() - 0.5) * 140,
+          -2 + Math.random() * 18,
+          -25 - Math.random() * 60
+        );
+        const s = 6 + Math.random() * 14;
+        m.scale.set(s * 1.6, s * 0.8, s);
+        m.userData = { driftPhase: Math.random() * Math.PI * 2, baseX: m.position.x };
+        mistGroup.add(m);
       }
     }
+    scene.add(mistGroup);
 
     // ============================================================
-    //  DRAGON (rope-follow spine, cyan/white banded body)
+    //  Lights
     // ============================================================
-    const cyanCol  = new THREE.Color(COLOR.CYAN);
-    const whiteCol = new THREE.Color(COLOR.WHITE);
+    scene.add(new THREE.AmbientLight(0x2a3d40, 0.55));
+    const moonLight = new THREE.DirectionalLight(0xffe6c2, 0.65);
+    moonLight.position.set(20, 18, 6);
+    scene.add(moonLight);
+    const rimDir = new THREE.DirectionalLight(0xff7a3a, 0.55);
+    rimDir.position.set(-12, -6, 8);
+    scene.add(rimDir);
 
-    const spinePoints = [];
-    for (let i = 0; i < CFG.DRAGON.SEGMENTS; i++) {
-      spinePoints.push(new THREE.Vector3(0, 4, i * CFG.DRAGON.SEG_DIST));
+    // Fire glow sticking near the dragon's mane
+    const maneLight = new THREE.PointLight(0xff7a3a, 2.6, 22, 1.6);
+    scene.add(maneLight);
+
+    // ============================================================
+    //  Dragon material — rim-lit ink with warm fire edge
+    // ============================================================
+    function makeInkMaterial({ color = COL.DRAGON_BODY, rimColor = COL.RIM_FIRE, rimStrength = 1.3, rimPower = 2.4, emissive = 0x000000, emissiveIntensity = 0 } = {}) {
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.55,
+        metalness: 0.35,
+        emissive,
+        emissiveIntensity,
+      });
+      mat.userData.rimColor = new THREE.Color(rimColor);
+      mat.userData.rimPower = rimPower;
+      mat.userData.rimStrength = rimStrength;
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.rimColor    = { value: mat.userData.rimColor };
+        shader.uniforms.rimPower    = { value: mat.userData.rimPower };
+        shader.uniforms.rimStrength = { value: mat.userData.rimStrength };
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <common>',
+          `#include <common>
+           uniform vec3  rimColor;
+           uniform float rimPower;
+           uniform float rimStrength;`
+        ).replace(
+          'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+          `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+           {
+             vec3 _vDir = normalize(vViewPosition);
+             float _rim = pow(1.0 - clamp(dot(normalize(normal), _vDir), 0.0, 1.0), rimPower);
+             outgoingLight += rimColor * _rim * rimStrength;
+           }`
+        );
+      };
+      return mat;
     }
 
-    function radiusFor(i) {
-      const n = CFG.DRAGON.SEGMENTS;
-      if (i === 0) return 0.95;
-      if (i < 4)   return 0.85 - i * 0.05;
-      if (i < 12)  return 0.7;
-      const t = (i - 12) / (n - 12);
-      const bulge = Math.sin(t * Math.PI) * 0.12;
-      return Math.max(0.08, 0.7 + bulge - t * 0.62);
-    }
-
+    // ============================================================
+    //  Dragon — parametric S-curve spine, animated, head tracks mouse
+    // ============================================================
+    const SPINE_N = 80;
     const dragonGroup = new THREE.Group();
     scene.add(dragonGroup);
-    const segments = [];
 
-    for (let i = 0; i < CFG.DRAGON.SEGMENTS; i++) {
-      const r = radiusFor(i);
-      const isCyan = Math.sin(i * 0.55) > 0;
-      const col = isCyan ? cyanCol : whiteCol;
-      const mat = new THREE.MeshPhysicalMaterial({
-        color: col,
-        emissive: col,
-        emissiveIntensity: isCyan ? 0.55 : 0.35,
-        metalness: 0.45,
-        roughness: 0.22,
-        clearcoat: 0.9,
-        clearcoatRoughness: 0.15,
-      });
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat);
-      mesh.scale.z = 1.35;
-      dragonGroup.add(mesh);
-      segments.push({ mesh, r });
+    const bodyMat   = makeInkMaterial({ color: COL.DRAGON_BODY, rimColor: COL.RIM_FIRE, rimStrength: 1.4, rimPower: 2.2 });
+    const bellyMat  = makeInkMaterial({ color: COL.DRAGON_BELLY, rimColor: COL.MANE_GOLD, rimStrength: 0.6, rimPower: 3.0 });
+    const finMat    = makeInkMaterial({ color: 0x2a1610, rimColor: COL.RIM_FIRE, rimStrength: 1.8, rimPower: 1.6, emissive: 0x381205, emissiveIntensity: 0.3 });
+    const hornMat   = makeInkMaterial({ color: 0x2a201a, rimColor: 0xffd6a0, rimStrength: 1.0, rimPower: 2.8 });
 
-      if (i > 4 && i < CFG.DRAGON.SEGMENTS - 6 && i % 2 === 0) {
-        const fin = new THREE.Mesh(
-          new THREE.ConeGeometry(0.10, r * 1.5, 8),
-          new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.7, metalness: 0.3, roughness: 0.25 })
-        );
-        fin.position.y = r * 0.85;
-        mesh.add(fin);
-      }
+    function radiusFor(i) {
+      if (i === 0) return 1.05;
+      if (i < 5)   return 0.95 - i * 0.04;
+      if (i < 14)  return 0.85;
+      const t = (i - 14) / (SPINE_N - 14);
+      const bulge = Math.sin(t * Math.PI) * 0.18;
+      return Math.max(0.06, 0.85 + bulge - t * 0.78);
     }
 
-    // Head decorations
-    const head = segments[0].mesh;
-    const headR = segments[0].r;
-    {
-      const eyeGeo = new THREE.SphereGeometry(0.13, 12, 12);
-      const eyeMat = new THREE.MeshBasicMaterial({ color: COLOR.WHITE });
-      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.42, 0.32, -0.55);
-      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set( 0.42, 0.32, -0.55);
-      head.add(eyeL); head.add(eyeR);
-      const pupGeo = new THREE.SphereGeometry(0.06, 10, 10);
-      const pupMat = new THREE.MeshBasicMaterial({ color: 0x041020 });
-      const pupL = new THREE.Mesh(pupGeo, pupMat); pupL.position.set(-0.42, 0.32, -0.66);
-      const pupR = new THREE.Mesh(pupGeo, pupMat); pupR.position.set( 0.42, 0.32, -0.66);
-      head.add(pupL); head.add(pupR);
+    const segments = [];
+    const spine = new Array(SPINE_N).fill(0).map(() => new THREE.Vector3());
 
-      function makeHorn(side) {
+    for (let i = 0; i < SPINE_N; i++) {
+      const r = radiusFor(i);
+      const seg = new THREE.Group();
+
+      // Body sphere (dark, rim-lit)
+      const body = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 14), bodyMat);
+      body.scale.z = 1.32;
+      seg.add(body);
+
+      // Belly stripe (thin underside band)
+      if (i > 1 && i < SPINE_N - 6) {
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(r * 0.82, 16, 10, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.35), bellyMat);
+        belly.scale.set(0.78, 1.0, 1.32);
+        belly.position.y = -r * 0.08;
+        seg.add(belly);
+      }
+
+      // Dorsal fin: jagged red-orange spines
+      if (i > 3 && i < SPINE_N - 8 && i % 2 === 0) {
+        const fin = new THREE.Mesh(new THREE.ConeGeometry(0.13, r * 1.6, 6), finMat);
+        fin.position.y = r * 0.85;
+        fin.rotation.x = -0.05;
+        seg.add(fin);
+      }
+
+      dragonGroup.add(seg);
+      segments.push({ group: seg, body, r });
+    }
+
+    // ---- Head ornaments ----
+    const headSeg  = segments[0];
+    const headMesh = headSeg.group;
+    const headR    = headSeg.r;
+    {
+      // Eyes (glowing yellow)
+      const eyeMat = new THREE.MeshBasicMaterial({ color: COL.EYE_GLOW });
+      const eyeGeo = new THREE.SphereGeometry(0.13, 12, 12);
+      const eL = new THREE.Mesh(eyeGeo, eyeMat); eL.position.set(-0.45, 0.36, -0.55);
+      const eR = new THREE.Mesh(eyeGeo, eyeMat); eR.position.set( 0.45, 0.36, -0.55);
+      headMesh.add(eL); headMesh.add(eR);
+
+      const pupMat = new THREE.MeshBasicMaterial({ color: 0x100804 });
+      const pupGeo = new THREE.SphereGeometry(0.06, 10, 10);
+      const pL = new THREE.Mesh(pupGeo, pupMat); pL.position.set(-0.45, 0.36, -0.66);
+      const pR = new THREE.Mesh(pupGeo, pupMat); pR.position.set( 0.45, 0.36, -0.66);
+      headMesh.add(pL); headMesh.add(pR);
+
+      // Snout
+      const snout = new THREE.Mesh(
+        new THREE.SphereGeometry(0.6, 16, 12),
+        bodyMat
+      );
+      snout.scale.set(0.95, 0.78, 1.18);
+      snout.position.set(0, -0.05, -0.95);
+      headMesh.add(snout);
+
+      // Lower jaw — small open mouth hint
+      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.18, 0.55), bodyMat);
+      jaw.position.set(0, -0.35, -0.85);
+      headMesh.add(jaw);
+
+      // Fangs
+      const fangMat = new THREE.MeshStandardMaterial({ color: 0xfff5e0, roughness: 0.4, metalness: 0.2, emissive: 0x6a4020, emissiveIntensity: 0.15 });
+      for (const sx of [-0.18, 0.18]) {
+        const fang = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), fangMat);
+        fang.position.set(sx, -0.18, -1.05);
+        fang.rotation.x = Math.PI;
+        headMesh.add(fang);
+      }
+
+      // Branching antler-like horns
+      function buildHorn(side) {
         const horn = new THREE.Group();
         let prev = new THREE.Vector3();
-        for (let i = 0; i < 4; i++) {
-          const len = 0.55 - i * 0.08;
-          const rad = 0.10 - i * 0.018;
-          const c = new THREE.Mesh(
-            new THREE.ConeGeometry(rad, len, 8),
-            new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.5, metalness: 0.3, roughness: 0.35 })
-          );
+        for (let i = 0; i < 5; i++) {
+          const len = 0.65 - i * 0.09;
+          const rad = 0.12 - i * 0.02;
+          const c = new THREE.Mesh(new THREE.ConeGeometry(rad, len, 8), hornMat);
           c.position.copy(prev);
           c.position.y += len * 0.5;
-          c.position.x += side * (i * 0.08);
-          c.position.z -= i * 0.05;
-          c.rotation.z = side * (0.25 + i * 0.12);
+          c.position.x += side * (i * 0.10);
+          c.position.z -= i * 0.07;
+          c.rotation.z = side * (0.22 + i * 0.10);
+          c.rotation.x = -i * 0.06;
           horn.add(c);
-          prev = new THREE.Vector3(c.position.x + side * 0.08, c.position.y + len * 0.5, c.position.z);
+          prev = new THREE.Vector3(c.position.x + side * 0.1, c.position.y + len * 0.5, c.position.z - 0.05);
         }
         return horn;
       }
-      const hL = makeHorn(-1); hL.position.set(-0.25, headR * 0.55, 0.05); head.add(hL);
-      const hR = makeHorn( 1); hR.position.set( 0.25, headR * 0.55, 0.05); head.add(hR);
+      const hL = buildHorn(-1); hL.position.set(-0.32, headR * 0.55, 0.10); headMesh.add(hL);
+      const hR = buildHorn( 1); hR.position.set( 0.32, headR * 0.55, 0.10); headMesh.add(hR);
 
-      const snout = new THREE.Mesh(
-        new THREE.SphereGeometry(0.55, 14, 10),
-        new THREE.MeshPhysicalMaterial({ color: COLOR.CYAN, emissive: COLOR.CYAN, emissiveIntensity: 0.5, metalness: 0.4, roughness: 0.25, clearcoat: 0.8 })
-      );
-      snout.scale.set(0.85, 0.7, 1.1);
-      snout.position.set(0, -0.05, -0.85);
-      head.add(snout);
-
-      // Mane
-      for (let i = 0; i < 14; i++) {
+      // Mane: cluster of warm emissive spheres along nape
+      const maneColors = [COL.MANE_HOT, COL.MANE_GOLD, COL.RIM_FIRE, 0xffd07a, 0xff5a25];
+      for (let i = 0; i < 26; i++) {
+        const c = maneColors[i % maneColors.length];
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.18 + Math.random() * 0.08, 8, 8),
-          new THREE.MeshPhysicalMaterial({
-            color: i % 2 ? COLOR.WHITE : COLOR.CYAN,
-            emissive: i % 2 ? COLOR.WHITE : COLOR.CYAN,
-            emissiveIntensity: 0.45,
-            roughness: 0.4, metalness: 0.2,
+          new THREE.SphereGeometry(0.16 + Math.random() * 0.12, 10, 8),
+          new THREE.MeshStandardMaterial({
+            color: c, emissive: c, emissiveIntensity: 1.4,
+            roughness: 0.35, metalness: 0.1,
           })
         );
-        m.position.set((Math.random()-0.5)*0.7, 0.55 + Math.random()*0.3, 0.3 + Math.random()*0.5);
-        head.add(m);
+        m.position.set(
+          (Math.random() - 0.5) * 0.85,
+          0.35 + Math.random() * 0.55,
+          0.45 + Math.random() * 0.85
+        );
+        headMesh.add(m);
       }
     }
 
-    // Whiskers
+    // Whiskers (long flowing)
     function makeWhisker() {
-      const mat = new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.7, metalness: 0.2, roughness: 0.3 });
-      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
-      head.add(mesh);
-      return mesh;
+      const mat = new THREE.MeshStandardMaterial({ color: 0x1a120c, emissive: 0x2a0e04, emissiveIntensity: 0.25, metalness: 0.2, roughness: 0.5 });
+      const m = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      headMesh.add(m);
+      return m;
     }
     const whiskerL = makeWhisker();
     const whiskerR = makeWhisker();
+
     function rebuildWhisker(mesh, side, t) {
       const pts = [];
-      for (let i = 0; i <= 20; i++) {
-        const u = i / 20;
-        const z = -0.9 - u * 4.5;
-        const wave = Math.sin(t * 3 + u * 6 + side) * 0.55 * u;
-        const drop = -u * 0.6;
-        pts.push(new THREE.Vector3(side * (0.25 + u * 0.6 + wave * 0.3), drop + wave * 0.4, z));
+      const N = 26;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        const z = -0.95 - u * 6.0;
+        const wave = Math.sin(t * 2.3 + u * 5.5 + side * 1.2) * 0.7 * u;
+        const drop = -u * 0.7;
+        pts.push(new THREE.Vector3(side * (0.28 + u * 0.7 + wave * 0.3), drop + wave * 0.45, z));
       }
       const curve = new THREE.CatmullRomCurve3(pts);
-      const newGeo = new THREE.TubeGeometry(curve, 24, 0.04, 5, false);
+      const newGeo = new THREE.TubeGeometry(curve, 28, 0.045, 6, false);
       mesh.geometry.dispose();
       mesh.geometry = newGeo;
     }
 
     // ============================================================
-    //  LANTERN
+    //  Spine animation — animated S-curve, head tracks mouse
     // ============================================================
-    function buildLantern() {
-      const g = new THREE.Group();
+    const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
 
-      // Body (red lantern, slightly squashed sphere)
-      const body = new THREE.Mesh(
-        new THREE.SphereGeometry(1, 18, 12),
-        new THREE.MeshStandardMaterial({
-          color: COLOR.RED, emissive: 0xff5555, emissiveIntensity: 0.9,
-          roughness: 0.55, metalness: 0.1, flatShading: true,
-        })
-      );
-      body.scale.set(1, 0.78, 1);
-      g.add(body);
-
-      // Gold caps
-      const capMat = new THREE.MeshStandardMaterial({
-        color: COLOR.GOLD, emissive: 0x664422, emissiveIntensity: 0.4,
-        metalness: 0.7, roughness: 0.3, flatShading: true,
-      });
-      const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 0.18, 14), capMat);
-      cap1.position.y =  0.78;
-      const cap2 = cap1.clone();
-      cap2.position.y = -0.78;
-      g.add(cap1); g.add(cap2);
-
-      // Tassel
-      const tasselMat = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0x886622, emissiveIntensity: 0.6, metalness: 0.5, roughness: 0.4 });
-      const tasselTop = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 6), tasselMat);
-      tasselTop.position.y = -1.05;
-      const tasselBot = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 8), tasselMat);
-      tasselBot.position.y = -1.45;
-      g.add(tasselTop); g.add(tasselBot);
-
-      // Inner glow point light (cheap, only 1 active per lantern works fine)
-      const glow = new THREE.PointLight(0xff5544, 0.9, 8, 2);
-      g.add(glow);
-
-      g.userData = {
-        active: false,
-        bobPhase: 0,
-        spinSpeed: 0,
-        riseSpeed: 0,
-      };
-      g.visible = false;
-      return g;
+    function spineSample(t, time) {
+      // t ∈ [0,1] from head (0) to tail (1)
+      // Anchor point in world space, sweeping through a flowing S
+      const ar = 14;                                         // arc radius
+      const phase = time * 0.18;
+      const x =  Math.sin((1 - t) * 3.4 + phase) * ar
+              + Math.sin((1 - t) * 1.2 + phase * 0.7) * 4
+              - 4;
+      const y =  Math.cos((1 - t) * 2.6 + phase) * 5
+              + Math.sin((1 - t) * 4.8 + phase * 1.4) * 1.5
+              + 2;
+      const z =  Math.cos((1 - t) * 2.0 + phase * 0.9) * 6
+              - t * 4
+              - 2;
+      return { x, y, z };
     }
 
-    const lanternPool = [];
-    for (let i = 0; i < CFG.LANTERN.POOL; i++) {
-      const l = buildLantern();
-      scene.add(l);
-      lanternPool.push(l);
-    }
+    const tmp = new THREE.Vector3();
+    const tmp2 = new THREE.Vector3();
 
-    function spawnLantern() {
-      const l = lanternPool.find(o => !o.userData.active);
-      if (!l) return;
-      const head = spinePoints[0];
-      const fwd  = direction.clone();
-      const dist = THREE.MathUtils.lerp(CFG.LANTERN.SPAWN_AHEAD.min, CFG.LANTERN.SPAWN_AHEAD.max, Math.random());
-      // basis perpendicular to forward
-      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
-      const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
-      const offX  = (Math.random() - 0.5) * 2 * CFG.LANTERN.SPREAD;
-      const offY  = (Math.random() - 0.4) * 2 * CFG.LANTERN.SPREAD * 0.7;
-      l.position.copy(head)
-        .addScaledVector(fwd,   dist)
-        .addScaledVector(right, offX)
-        .addScaledVector(up,    offY);
-      l.userData.active    = true;
-      l.userData.bobPhase  = Math.random() * Math.PI * 2;
-      l.userData.spinSpeed = (Math.random() - 0.5) * 0.6;
-      l.userData.riseSpeed = 0.4 + Math.random() * 0.6;
-      l.visible = true;
-    }
-
-    function recycleLantern(l) {
-      l.userData.active = false;
-      l.visible = false;
-    }
-
-    // ============================================================
-    //  PHOENIX
-    // ============================================================
-    function buildPhoenix() {
-      const g = new THREE.Group();
-
-      const bodyMat  = new THREE.MeshStandardMaterial({ color: 0xff5a2c, emissive: 0xff7733, emissiveIntensity: 0.9, metalness: 0.4, roughness: 0.35, flatShading: true });
-      const goldMat  = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0xffaa33, emissiveIntensity: 1.0, metalness: 0.6, roughness: 0.3, flatShading: true });
-      const wingMat  = new THREE.MeshStandardMaterial({ color: 0xff3a4c, emissive: 0xff6688, emissiveIntensity: 0.85, metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide, flatShading: true });
-      const tailMat1 = new THREE.MeshStandardMaterial({ color: 0xff3a4c, emissive: 0xff5566, emissiveIntensity: 0.9, flatShading: true });
-      const tailMat2 = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0xffcc55, emissiveIntensity: 1.0, flatShading: true });
-
-      // Body
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 10), bodyMat);
-      body.scale.set(0.85, 0.7, 1.4);
-      g.add(body);
-
-      // Head
-      const headM = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), bodyMat);
-      headM.position.set(0, 0.35, 1.1);
-      g.add(headM);
-
-      // Beak
-      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 8), goldMat);
-      beak.rotation.x = Math.PI / 2;
-      beak.position.set(0, 0.3, 1.7);
-      g.add(beak);
-
-      // Crest
-      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.7, 6), goldMat);
-      crest.position.set(0, 0.85, 1.0);
-      crest.rotation.x = -0.4;
-      g.add(crest);
-
-      // Eyes
-      const eye = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const eL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eye);
-      const eR = eL.clone();
-      eL.position.set(-0.22, 0.42, 1.45);
-      eR.position.set( 0.22, 0.42, 1.45);
-      g.add(eL); g.add(eR);
-
-      // Wings (animated)
-      const wingShape = new THREE.Shape();
-      wingShape.moveTo(0, 0);
-      wingShape.lineTo(2.6, 0.3);
-      wingShape.lineTo(2.9, -0.4);
-      wingShape.lineTo(2.0, -0.6);
-      wingShape.lineTo(0.6, -0.3);
-      wingShape.lineTo(0, 0);
-      const wingGeo = new THREE.ShapeGeometry(wingShape);
-      const wingL = new THREE.Mesh(wingGeo, wingMat);
-      const wingR = new THREE.Mesh(wingGeo, wingMat);
-      wingL.position.set(-0.5, 0.1, 0.0);
-      wingR.position.set( 0.5, 0.1, 0.0);
-      wingR.scale.x = -1;
-      g.add(wingL); g.add(wingR);
-
-      // Tail feathers
-      const tailGroup = new THREE.Group();
-      tailGroup.position.set(0, 0, -1.1);
-      for (let i = 0; i < 7; i++) {
-        const t = i / 6;
-        const feather = new THREE.Mesh(
-          new THREE.ConeGeometry(0.18 - t * 0.06, 2.4 + t * 0.4, 6),
-          i % 2 ? tailMat2 : tailMat1
-        );
-        feather.rotation.x = Math.PI / 2;
-        feather.position.set((t - 0.5) * 1.4, (i % 2) * 0.15, -1.0);
-        feather.rotation.z = (t - 0.5) * 0.5;
-        tailGroup.add(feather);
+    function updateDragon(time) {
+      // Sample base spine path
+      for (let i = 0; i < SPINE_N; i++) {
+        const t = i / (SPINE_N - 1);
+        const p = spineSample(t, time);
+        spine[i].set(p.x, p.y, p.z);
       }
-      g.add(tailGroup);
 
-      // Glow
-      const glow = new THREE.PointLight(0xff7744, 2.0, 18, 2);
-      g.add(glow);
-
-      g.userData = {
-        active:    false,
-        wingL:     wingL,
-        wingR:     wingR,
-        tail:      tailGroup,
-        startPos:  new THREE.Vector3(),
-        endPos:    new THREE.Vector3(),
-        t:         0,
-        duration:  6,
-      };
-      g.visible = false;
-      return g;
-    }
-
-    const phoenix = buildPhoenix();
-    scene.add(phoenix);
-    let nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max);
-
-    function spawnPhoenix() {
-      const head = spinePoints[0];
-      const fwd  = direction.clone();
-      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
-      const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
-      // start from one side, end at the other, passing in front of player
-      const side  = Math.random() < 0.5 ? -1 : 1;
-      const dist  = 80;
-      phoenix.userData.startPos.copy(head)
-        .addScaledVector(fwd,   dist)
-        .addScaledVector(right, side * 60)
-        .addScaledVector(up,    (Math.random() - 0.3) * 14);
-      phoenix.userData.endPos.copy(head)
-        .addScaledVector(fwd,   dist + 30)
-        .addScaledVector(right, -side * 60)
-        .addScaledVector(up,    (Math.random() - 0.3) * 14);
-      phoenix.userData.t = 0;
-      phoenix.userData.duration = 7 + Math.random() * 3;
-      phoenix.userData.active = true;
-      phoenix.position.copy(phoenix.userData.startPos);
-      phoenix.visible = true;
-    }
-
-    // ============================================================
-    //  COLLECT BURSTS (visual feedback)
-    // ============================================================
-    const burstPool = [];
-    function buildBurst() {
-      const g = new THREE.Group();
-      const parts = [];
+      // Bias the head toward the mouse for subtle tracking
+      const headBias = new THREE.Vector3(mouse.x * 6, mouse.y * 4, mouse.x * 1.5);
+      // Falloff over the first ~10 segments
       for (let i = 0; i < 12; i++) {
-        const m = new THREE.Mesh(
-          new THREE.IcosahedronGeometry(0.28, 0),
-          new THREE.MeshBasicMaterial({ color: COLOR.WHITE, transparent: true })
-        );
-        const v = new THREE.Vector3(
-          Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5
-        ).normalize().multiplyScalar(8 + Math.random() * 6);
-        parts.push({ mesh: m, vel: v });
-        g.add(m);
-      }
-      g.userData = { active: false, t: 0, life: 0.7, parts };
-      g.visible = false;
-      scene.add(g);
-      return g;
-    }
-    for (let i = 0; i < 6; i++) burstPool.push(buildBurst());
-
-    function triggerBurst(pos, color) {
-      const b = burstPool.find(b => !b.userData.active);
-      if (!b) return;
-      b.position.copy(pos);
-      b.userData.active = true;
-      b.userData.t = 0;
-      const c = new THREE.Color(color);
-      for (const p of b.userData.parts) {
-        p.mesh.material.color.copy(c);
-        p.mesh.material.opacity = 1;
-        p.mesh.position.set(0,0,0);
-        p.mesh.scale.setScalar(1);
-      }
-      b.visible = true;
-    }
-
-    function updateBursts(dt) {
-      for (const b of burstPool) {
-        if (!b.userData.active) continue;
-        b.userData.t += dt;
-        const u = b.userData.t / b.userData.life;
-        if (u >= 1) { b.userData.active = false; b.visible = false; continue; }
-        for (const p of b.userData.parts) {
-          p.mesh.position.addScaledVector(p.vel, dt);
-          p.mesh.material.opacity = 1 - u;
-          p.mesh.scale.setScalar(1 - u * 0.5);
-        }
-      }
-    }
-
-    // ============================================================
-    //  INPUT — keyboard (ZQSD/Arrows) + pointer drag (mouse/touch)
-    // ============================================================
-    const pointer = state.pointer;
-    const keys    = state.keys;
-
-    function setTargetFromPointer(e) {
-      pointer.x = (e.clientX / innerWidth)  * 2 - 1;
-      pointer.y = (e.clientY / innerHeight) * 2 - 1;
-      dom.reticle.style.left = e.clientX + 'px';
-      dom.reticle.style.top  = e.clientY + 'px';
-      // Map screen → world target inside corridor
-      state.target.x = pointer.x * CFG.DRAGON.CORRIDOR_X;
-      state.target.y = -pointer.y * CFG.DRAGON.CORRIDOR_Y + CFG.DRAGON.BASE_Y;
-    }
-
-    addEventListener('pointerdown', (e) => {
-      pointer.down = true;
-      setTargetFromPointer(e);
-      if (state.mode === 'play') dom.reticle.style.opacity = '1';
-    }, { passive: true });
-
-    addEventListener('pointermove', (e) => {
-      if (pointer.down) setTargetFromPointer(e);
-    }, { passive: true });
-
-    addEventListener('pointerup',     () => { pointer.down = false; dom.reticle.style.opacity = '0'; });
-    addEventListener('pointercancel', () => { pointer.down = false; dom.reticle.style.opacity = '0'; });
-
-    function keyToFlag(code, value) {
-      switch (code) {
-        case 'KeyZ': case 'KeyW': case 'ArrowUp':    keys.up    = value; return true;
-        case 'KeyS':              case 'ArrowDown':  keys.down  = value; return true;
-        case 'KeyQ': case 'KeyA': case 'ArrowLeft':  keys.left  = value; return true;
-        case 'KeyD':              case 'ArrowRight': keys.right = value; return true;
-      }
-      return false;
-    }
-    addEventListener('keydown', (e) => { if (keyToFlag(e.code, true))  e.preventDefault(); });
-    addEventListener('keyup',   (e) => { if (keyToFlag(e.code, false)) e.preventDefault(); });
-
-    // ============================================================
-    //  GAME FLOW
-    // ============================================================
-    function startGame() {
-      state.mode      = 'play';
-      state.score     = 0;
-      state.timeLeft  = CFG.GAME.START_TIME;
-      state.speed     = CFG.DRAGON.BASE_SPEED;
-      state.target.x  = 0;
-      state.target.y  = CFG.DRAGON.BASE_Y;
-      // Reset spine in front of camera, pointing forward
-      for (let i = 0; i < spinePoints.length; i++) {
-        spinePoints[i].set(0, CFG.DRAGON.BASE_Y, i * CFG.DRAGON.SEG_DIST);
-      }
-      // Clear lanterns / phoenix
-      lanternPool.forEach(recycleLantern);
-      phoenix.userData.active = false;
-      phoenix.visible = false;
-      nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max);
-
-      // Pre-populate a few lanterns
-      direction.set(0, 0, -1);
-      for (let i = 0; i < 8; i++) spawnLantern();
-
-      dom.start.classList.add('hidden');
-      dom.end.classList.add('hidden');
-      dom.reticle.style.opacity = pointer.down ? '1' : '0';
-      updateHUD();
-    }
-
-    function endGame() {
-      state.mode = 'over';
-      if (state.score > state.best) {
-        state.best = state.score;
-        localStorage.setItem(STORAGE_BEST, String(state.best));
-      }
-      dom.endScore.textContent = state.score;
-      dom.endBest.textContent  = state.best;
-      dom.end.classList.remove('hidden');
-      dom.reticle.style.opacity = '0';
-    }
-
-    function showBonus(text, color) {
-      dom.bonus.textContent = text;
-      dom.bonus.style.color = color;
-      dom.bonus.classList.remove('show');
-      void dom.bonus.offsetWidth;
-      dom.bonus.classList.add('show');
-      clearTimeout(showBonus._to);
-      showBonus._to = setTimeout(() => dom.bonus.classList.remove('show'), 700);
-    }
-
-    function updateHUD() {
-      dom.score.textContent = state.score;
-      const t = Math.max(0, state.timeLeft);
-      dom.timer.textContent = t.toFixed(1);
-      dom.timer.classList.toggle('warn', t < 5);
-    }
-
-    dom.btnStart.addEventListener('click', startGame);
-    dom.btnRestart.addEventListener('click', startGame);
-
-    // ============================================================
-    //  GAME LOOP
-    // ============================================================
-    const direction = new THREE.Vector3(0, 0, -1);
-    const tmpVec    = new THREE.Vector3();
-    const camTarget = new THREE.Vector3();
-    const camLook   = new THREE.Vector3();
-    const clock     = new THREE.Clock();
-    let time = 0;
-
-    function randRange(a, b) { return a + Math.random() * (b - a); }
-
-    const headPrev = new THREE.Vector3();
-
-    function updateDragon(dt) {
-      // Always forward in -Z (rail direction)
-      direction.set(0, 0, -1);
-
-      // Speed ramps with score
-      state.speed = Math.min(
-        CFG.DRAGON.MAX_SPEED,
-        CFG.DRAGON.BASE_SPEED + state.score * CFG.DRAGON.SPEED_RAMP
-      );
-
-      const head = spinePoints[0];
-      headPrev.copy(head);
-
-      // ---- Lateral input ----
-      // Keyboard: instant velocity, ix/iy in [-1,1]
-      const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-      const iy = (keys.up    ? 1 : 0) - (keys.down ? 1 : 0);
-      head.x += ix * CFG.DRAGON.LATERAL_SPEED * dt;
-      head.y += iy * CFG.DRAGON.LATERAL_SPEED * dt;
-
-      // Pointer drag: lerp toward screen-mapped target
-      if (pointer.down) {
-        const k = 1 - Math.exp(-dt * 8);
-        head.x = THREE.MathUtils.lerp(head.x, state.target.x, k);
-        head.y = THREE.MathUtils.lerp(head.y, state.target.y, k);
+        const w = (1 - i / 12) * 0.7;
+        spine[i].x += headBias.x * w;
+        spine[i].y += headBias.y * w;
+        spine[i].z += headBias.z * w;
       }
 
-      // Clamp to corridor
-      head.x = THREE.MathUtils.clamp(head.x, -CFG.DRAGON.CORRIDOR_X, CFG.DRAGON.CORRIDOR_X);
-      head.y = THREE.MathUtils.clamp(
-        head.y,
-        CFG.DRAGON.BASE_Y - CFG.DRAGON.CORRIDOR_Y,
-        CFG.DRAGON.BASE_Y + CFG.DRAGON.CORRIDOR_Y,
-      );
-
-      // Forward advance
-      head.z -= state.speed * dt;
-
-      // Rope-follow body
-      for (let i = 1; i < spinePoints.length; i++) {
-        const prev = spinePoints[i - 1];
-        const curr = spinePoints[i];
-        tmpVec.subVectors(curr, prev);
-        const d = tmpVec.length();
-        if (d > CFG.DRAGON.SEG_DIST || d < 1e-4) {
-          if (d < 1e-4) tmpVec.set(0, 0, CFG.DRAGON.SEG_DIST);
-          else          tmpVec.multiplyScalar(CFG.DRAGON.SEG_DIST / d);
-          curr.copy(prev).add(tmpVec);
-        }
-      }
-
-      // Apply to meshes + look-at (head looks toward its motion direction)
-      const motion = tmpVec.copy(head).sub(headPrev);
-      if (motion.lengthSq() < 1e-6) motion.copy(direction);
-      const headLook = motion.normalize().add(head);
-
-      for (let i = 0; i < segments.length; i++) {
+      // Apply to meshes + orient toward next-forward joint
+      for (let i = 0; i < SPINE_N; i++) {
         const seg = segments[i];
-        seg.mesh.position.copy(spinePoints[i]);
-        seg.mesh.lookAt(i === 0 ? headLook : spinePoints[i - 1]);
+        seg.group.position.copy(spine[i]);
+        // Look from this segment toward the previous (forward) one — head looks ahead
+        const target = i === 0
+          ? tmp.copy(spine[0]).add(tmp2.subVectors(spine[0], spine[1]).normalize())
+          : spine[i - 1];
+        seg.group.lookAt(target);
       }
 
-      // Bank the head into the lateral motion for that arcade tilt
-      const bank = -ix * 0.4 + (pointer.down ? (state.target.x - head.x) * 0.04 : 0);
-      head_visualBank(segments[0].mesh, bank);
-
-      headLight.position.copy(head);
+      // Mane light follows nape (segment 3)
+      maneLight.position.copy(spine[3]);
 
       rebuildWhisker(whiskerL, -1, time);
       rebuildWhisker(whiskerR,  1, time);
     }
 
-    // Apply a small roll to the head mesh on top of its lookAt orientation
-    function head_visualBank(mesh, bankZ) {
-      mesh.rotateZ(bankZ);
+    // ============================================================
+    //  Cherry blossom petals (instanced)
+    // ============================================================
+    const PETAL_COUNT = 260;
+
+    // Petal shape
+    const petalShape = new THREE.Shape();
+    petalShape.moveTo(0, 0);
+    petalShape.bezierCurveTo(0.55, 0.25, 0.55, 0.85, 0, 1.05);
+    petalShape.bezierCurveTo(-0.55, 0.85, -0.55, 0.25, 0, 0);
+    const petalGeo = new THREE.ShapeGeometry(petalShape, 6);
+    petalGeo.translate(0, -0.5, 0);
+    petalGeo.scale(0.45, 0.45, 0.45);
+
+    const petalMat = new THREE.MeshStandardMaterial({
+      color: COL.PETAL_LIGHT,
+      emissive: COL.PETAL_DEEP,
+      emissiveIntensity: 0.25,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.95,
+      roughness: 0.6,
+      metalness: 0.0,
+    });
+
+    const petals = new THREE.InstancedMesh(petalGeo, petalMat, PETAL_COUNT);
+    petals.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(petals);
+
+    const petalState = [];
+    const petalRange = { x: 80, y: 30, zMin: -25, zMax: 18, fallTop: 25, fallBot: -18 };
+    const petalDummy = new THREE.Object3D();
+    const petalColor = new THREE.Color();
+
+    // Per-instance color tint
+    for (let i = 0; i < PETAL_COUNT; i++) {
+      const tone = Math.random();
+      petalColor.setHex(tone < 0.5 ? COL.PETAL_LIGHT : COL.PETAL_DEEP);
+      petalColor.offsetHSL(0, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1);
+      petals.setColorAt(i, petalColor);
+    }
+    if (petals.instanceColor) petals.instanceColor.needsUpdate = true;
+
+    function spawnPetal(reuseIdx) {
+      const s = petalState[reuseIdx] || (petalState[reuseIdx] = {});
+      s.x = (Math.random() - 0.5) * petalRange.x;
+      s.y = petalRange.fallTop + Math.random() * petalRange.y;
+      s.z = petalRange.zMin + Math.random() * (petalRange.zMax - petalRange.zMin);
+      s.rx = Math.random() * Math.PI * 2;
+      s.ry = Math.random() * Math.PI * 2;
+      s.rz = Math.random() * Math.PI * 2;
+      s.rxv = (Math.random() - 0.5) * 0.6;
+      s.ryv = (Math.random() - 0.5) * 1.2;
+      s.rzv = (Math.random() - 0.5) * 0.4;
+      s.fall = 0.6 + Math.random() * 0.9;
+      s.swayPhase = Math.random() * Math.PI * 2;
+      s.swayAmp   = 0.4 + Math.random() * 0.9;
+      s.scale     = 0.6 + Math.random() * 0.9;
+      return s;
+    }
+    for (let i = 0; i < PETAL_COUNT; i++) {
+      spawnPetal(i);
+      // Pre-distribute vertically so they're already falling at start
+      petalState[i].y = petalRange.fallBot + Math.random() * (petalRange.fallTop - petalRange.fallBot + petalRange.y);
     }
 
-    function updateCamera(dt) {
-      const head = spinePoints[0];
-      // Fixed-orientation chase cam: behind in +Z, slight height, looks forward
-      camTarget.set(head.x * 0.55, head.y * 0.4 + CFG.DRAGON.BASE_Y * 0.6 + 1.6, head.z + 11);
-      camera.position.lerp(camTarget, 1 - Math.exp(-dt * 5));
-      camLook.set(head.x * 0.7, head.y * 0.6 + CFG.DRAGON.BASE_Y * 0.4, head.z - 8);
-      camera.lookAt(camLook);
-    }
+    function updatePetals(dt, time) {
+      for (let i = 0; i < PETAL_COUNT; i++) {
+        const s = petalState[i];
+        s.y -= s.fall * dt;
+        s.x += Math.sin(time * 0.7 + s.swayPhase) * s.swayAmp * dt;
+        s.z += Math.cos(time * 0.5 + s.swayPhase * 1.3) * s.swayAmp * 0.6 * dt;
+        s.rx += s.rxv * dt;
+        s.ry += s.ryv * dt;
+        s.rz += s.rzv * dt;
+        if (s.y < petalRange.fallBot) spawnPetal(i);
 
-    function updateLanterns(dt) {
-      const head = spinePoints[0];
-      for (const l of lanternPool) {
-        if (!l.userData.active) continue;
-        l.userData.bobPhase += dt;
-        l.position.y += l.userData.riseSpeed * dt;
-        l.position.x += Math.sin(l.userData.bobPhase * 0.7) * 0.3 * dt;
-        l.rotation.y += l.userData.spinSpeed * dt;
-
-        // Recycle if behind dragon (dot product < 0 and far)
-        tmpVec.subVectors(l.position, head);
-        const fwdDot = tmpVec.dot(direction);
-        if (fwdDot < -25 || tmpVec.length() > 220) {
-          recycleLantern(l);
-          continue;
-        }
-
-        // Collision
-        if (tmpVec.length() < CFG.LANTERN.RADIUS + 1.2) {
-          recycleLantern(l);
-          state.score += CFG.LANTERN.VALUE;
-          state.timeLeft = Math.min(CFG.GAME.MAX_TIME, state.timeLeft + CFG.LANTERN.BONUS_TIME);
-          triggerBurst(l.position, COLOR.RED);
-          showBonus('+' + CFG.LANTERN.VALUE, '#ff6677');
-          updateHUD();
-        }
+        petalDummy.position.set(s.x, s.y, s.z);
+        petalDummy.rotation.set(s.rx, s.ry, s.rz);
+        petalDummy.scale.setScalar(s.scale);
+        petalDummy.updateMatrix();
+        petals.setMatrixAt(i, petalDummy.matrix);
       }
-
-      // Maintain a population
-      const active = lanternPool.filter(l => l.userData.active).length;
-      const target = 8 + Math.min(10, Math.floor(state.score / 60));
-      if (active < target) spawnLantern();
-    }
-
-    function updatePhoenix(dt) {
-      if (phoenix.userData.active) {
-        phoenix.userData.t += dt;
-        const u = phoenix.userData.t / phoenix.userData.duration;
-        if (u >= 1) { phoenix.userData.active = false; phoenix.visible = false; return; }
-        // Curved path: lerp + sin lift
-        phoenix.position.lerpVectors(phoenix.userData.startPos, phoenix.userData.endPos, u);
-        phoenix.position.y += Math.sin(u * Math.PI) * 8;
-        // Face direction of travel
-        tmpVec.copy(phoenix.userData.endPos).sub(phoenix.userData.startPos);
-        phoenix.lookAt(phoenix.position.clone().add(tmpVec));
-        // Wing flap
-        const flap = Math.sin(time * 14) * 0.7;
-        phoenix.userData.wingL.rotation.y =  flap;
-        phoenix.userData.wingR.rotation.y = -flap;
-        phoenix.userData.tail.rotation.x = Math.sin(time * 8) * 0.15;
-
-        // Collision
-        tmpVec.subVectors(phoenix.position, spinePoints[0]);
-        if (tmpVec.length() < CFG.PHOENIX.RADIUS + 1.4) {
-          state.score += CFG.PHOENIX.VALUE;
-          state.timeLeft = Math.min(CFG.GAME.MAX_TIME, state.timeLeft + CFG.PHOENIX.BONUS_TIME);
-          triggerBurst(phoenix.position, COLOR.GOLD);
-          triggerBurst(phoenix.position, COLOR.RED);
-          showBonus('PHOENIX +' + CFG.PHOENIX.VALUE, '#ffd86b');
-          phoenix.userData.active = false;
-          phoenix.visible = false;
-          updateHUD();
-        }
-      } else {
-        nextPhoenixIn -= dt;
-        if (nextPhoenixIn <= 0) {
-          spawnPhoenix();
-          // Subsequent phoenixes get a bit more frequent at high score
-          const factor = Math.max(0.5, 1 - state.score * 0.0008);
-          nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max) * factor;
-        }
-      }
-    }
-
-    function updateClouds() {
-      // Keep clouds anchored relative to dragon so the world feels infinite
-      cloudGroup.position.copy(spinePoints[0]);
-    }
-
-    function tick() {
-      requestAnimationFrame(tick);
-      const dt = Math.min(clock.getDelta(), 1 / 30);
-      time += dt;
-
-      if (state.mode === 'play') {
-        updateDragon(dt);
-        updateLanterns(dt);
-        updatePhoenix(dt);
-        updateCamera(dt);
-        updateClouds();
-        updateBursts(dt);
-
-        state.timeLeft -= dt;
-        if (state.timeLeft <= 0) {
-          state.timeLeft = 0;
-          updateHUD();
-          endGame();
-        } else {
-          // Update HUD only ~10x/s to save layout
-          if ((time * 10 | 0) !== (tick._lastTick | 0)) {
-            updateHUD();
-            tick._lastTick = time * 10 | 0;
-          }
-        }
-      } else {
-        // Idle scene: gently drift dragon and camera
-        spinePoints[0].x = Math.sin(time * 0.3) * 6;
-        spinePoints[0].y = CFG.DRAGON.BASE_Y + Math.sin(time * 0.4) * 1.5;
-        spinePoints[0].z -= 4 * dt;
-        for (let i = 1; i < spinePoints.length; i++) {
-          const prev = spinePoints[i-1], curr = spinePoints[i];
-          tmpVec.subVectors(curr, prev);
-          const d = tmpVec.length();
-          if (d > CFG.DRAGON.SEG_DIST || d < 1e-4) {
-            if (d < 1e-4) tmpVec.set(0,0,CFG.DRAGON.SEG_DIST);
-            else          tmpVec.multiplyScalar(CFG.DRAGON.SEG_DIST / d);
-            curr.copy(prev).add(tmpVec);
-          }
-        }
-        for (let i = 0; i < segments.length; i++) {
-          segments[i].mesh.position.copy(spinePoints[i]);
-          const lookAt = i === 0 ? spinePoints[0].clone().add(new THREE.Vector3(0,0,-1)) : spinePoints[i-1];
-          segments[i].mesh.lookAt(lookAt);
-        }
-        headLight.position.copy(spinePoints[0]);
-        rebuildWhisker(whiskerL, -1, time);
-        rebuildWhisker(whiskerR,  1, time);
-        // Idle camera follows dragon side-on
-        const head = spinePoints[0];
-        camTarget.set(head.x + Math.cos(time * 0.2) * 14, head.y + 2, head.z + 14);
-        camera.position.lerp(camTarget, 1 - Math.exp(-dt * 1.4));
-        camera.lookAt(head);
-        updateClouds();
-      }
-
-      composer.render();
+      petals.instanceMatrix.needsUpdate = true;
     }
 
     // ============================================================
-    //  POST PROCESSING
+    //  God-ray planes (additive, in front of background)
     // ============================================================
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 0.08);
-    composer.addPass(bloom);
-    composer.addPass(new OutputPass());
+    const rayGroup = new THREE.Group();
+    scene.add(rayGroup);
+    {
+      const rayMat = new THREE.MeshBasicMaterial({
+        color: 0xffd9a8, transparent: true, opacity: 0.06,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+      });
+      for (let i = 0; i < 6; i++) {
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(7, 90), rayMat.clone());
+        plane.material.opacity = 0.04 + Math.random() * 0.07;
+        plane.position.set(8 + i * 2.4 + Math.random() * 1.5, 18, -30 - i * 2);
+        plane.rotation.z = -0.55 + (Math.random() - 0.5) * 0.06;
+        plane.userData.basePos = plane.position.clone();
+        rayGroup.add(plane);
+      }
+    }
 
     // ============================================================
-    //  RESIZE
+    //  Mouse + parallax
+    // ============================================================
+    const cursorEl = document.getElementById('cursor');
+    addEventListener('pointermove', (e) => {
+      mouse.tx = (e.clientX / innerWidth)  * 2 - 1;
+      mouse.ty = -((e.clientY / innerHeight) * 2 - 1);
+      cursorEl.style.left = e.clientX + 'px';
+      cursorEl.style.top  = e.clientY + 'px';
+    }, { passive: true });
+    addEventListener('pointerleave', () => { mouse.tx = 0; mouse.ty = 0; });
+
+    // ============================================================
+    //  Resize
     // ============================================================
     addEventListener('resize', () => {
       const w = innerWidth, h = innerHeight;
@@ -1104,11 +640,66 @@
       renderer.setSize(w, h);
       composer.setSize(w, h);
       bloom.setSize(w, h);
+      bgUniforms.uResolution.value.set(w, h);
     });
 
     // ============================================================
-    //  START
+    //  Postprocessing
     // ============================================================
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.85, 0.6, 0.18);
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+
+    // ============================================================
+    //  Loop
+    // ============================================================
+    const clock = new THREE.Clock();
+    let time = 0;
+
+    function tick() {
+      requestAnimationFrame(tick);
+      const dt = Math.min(clock.getDelta(), 1/30);
+      time += dt;
+
+      // Smooth mouse
+      mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 5);
+      mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 5);
+      bgUniforms.uTime.value = time;
+      bgUniforms.uMouse.value.set(mouse.x, mouse.y);
+
+      // Parallax on mountain layers (deeper = less movement)
+      mountainsFar.position.x  = -mouse.x * 1.0;
+      mountainsFar.position.y  = -10 - mouse.y * 0.8;
+      mountainsMid.position.x  = -mouse.x * 2.4;
+      mountainsMid.position.y  = -10 - mouse.y * 1.6;
+      mountainsNear.position.x = -mouse.x * 4.5;
+      mountainsNear.position.y = -10 - mouse.y * 2.8;
+
+      // Mist drift
+      for (const m of mistGroup.children) {
+        const u = m.userData;
+        m.position.x = u.baseX + Math.sin(time * 0.15 + u.driftPhase) * 8 - mouse.x * 3;
+        m.position.y += Math.sin(time * 0.4 + u.driftPhase) * 0.01;
+      }
+
+      // God rays gentle sway
+      for (const r of rayGroup.children) {
+        r.position.x = r.userData.basePos.x + Math.sin(time * 0.3 + r.position.z) * 0.3 - mouse.x * 0.6;
+        r.material.opacity = (0.04 + 0.04 * (0.5 + 0.5 * Math.sin(time * 0.6 + r.position.z))) ;
+      }
+
+      // Camera parallax
+      camera.position.x = mouse.x * 1.6;
+      camera.position.y = 2 + mouse.y * 1.0;
+      camera.lookAt(mouse.x * 0.5, 2 + mouse.y * 0.5, 0);
+
+      updateDragon(time);
+      updatePetals(dt, time);
+
+      composer.render();
+    }
     tick();
   </script>
 </body>
