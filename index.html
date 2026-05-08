@@ -240,14 +240,20 @@
       `,
     });
 
+    // Each eye is wrapped in a tilted group so the outer corner sits higher
+    // and the inner corner drops toward the snout — classic dragon glare.
     const eyeGeo = new THREE.PlaneGeometry(1.7, 1.2);
-    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-1.05, 0, 0.02);
-    eyeR.position.set( 1.05, 0, 0.02);
-    eyeR.scale.x = -1;                       // mirror so highlights are symmetric inward
-    dragonGroup.add(eyeL);
-    dragonGroup.add(eyeR);
+    function makeEye(side) {
+      const wrap = new THREE.Group();
+      const mesh = new THREE.Mesh(eyeGeo, eyeMat);
+      if (side > 0) mesh.scale.x = -1;       // mirror right eye for symmetric highlight
+      wrap.add(mesh);
+      wrap.position.set(side * 1.05, 0, 0.02);
+      wrap.rotation.z = side * -0.42;        // outer corner up, inner corner down
+      return wrap;
+    }
+    dragonGroup.add(makeEye(-1));
+    dragonGroup.add(makeEye( 1));
 
     const dragon = {
       active:   false,
