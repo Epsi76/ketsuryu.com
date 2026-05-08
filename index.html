@@ -2,28 +2,173 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <title>KetsuRyu</title>
   <style>
+    :root {
+      --c-cyan:  #2be2fe;
+      --c-white: #ffffff;
+      --c-gold:  #ffd86b;
+      --c-red:   #ff3a4c;
+      --c-bg:    #050505;
+    }
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
       overflow: hidden;
-      background: #050505;
+      background: var(--c-bg);
+      color: var(--c-white);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: none;
     }
-    canvas {
-      display: block;
+    canvas { display: block; }
+
+    /* HUD */
+    #hud {
+      position: fixed; inset: 0;
+      pointer-events: none;
+      z-index: 10;
     }
+    .hud-top {
+      position: absolute; top: 14px; left: 0; right: 0;
+      display: flex; justify-content: space-between;
+      padding: 0 18px;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(43,226,254,0.6);
+    }
+    .hud-top .label { opacity: 0.65; font-size: 10px; margin-bottom: 2px; }
+    .hud-top .value { font-size: 22px; font-weight: 700; }
+    .hud-top .value.warn { color: var(--c-red); text-shadow: 0 0 12px rgba(255,58,76,0.7); }
+
+    .hud-bonus {
+      position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -120%);
+      font-size: 22px; letter-spacing: 0.24em; text-transform: uppercase;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.2s;
+      text-shadow: 0 0 18px currentColor;
+    }
+    .hud-bonus.show { opacity: 1; transform: translate(-50%, -200%); transition: transform 0.6s ease-out, opacity 0.6s; }
+
+    /* Reticle */
+    #reticle {
+      position: fixed;
+      width: 26px; height: 26px;
+      border: 1.5px solid rgba(255,255,255,0.35);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 9;
+      mix-blend-mode: screen;
+      transition: opacity 0.2s;
+      opacity: 0;
+    }
+    #reticle::before {
+      content: ""; position: absolute; inset: 9px;
+      background: var(--c-cyan); border-radius: 50%;
+      box-shadow: 0 0 14px var(--c-cyan);
+    }
+
+    /* Overlay screens */
+    .overlay {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.92) 80%);
+      z-index: 20;
+      text-align: center;
+      gap: 22px;
+      padding: 24px;
+      transition: opacity 0.35s ease;
+    }
+    .overlay.hidden { opacity: 0; pointer-events: none; }
+    .overlay .title {
+      font-size: clamp(40px, 9vw, 88px);
+      letter-spacing: 0.1em;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--c-cyan);
+      text-shadow:
+        0 0 24px rgba(43,226,254,0.9),
+        0 0 48px rgba(43,226,254,0.4);
+      margin: 0;
+    }
+    .overlay .subtitle {
+      font-size: clamp(13px, 2.4vw, 16px);
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin: 0;
+      max-width: 540px;
+      line-height: 1.7;
+    }
+    .overlay .cta {
+      pointer-events: auto;
+      cursor: pointer;
+      padding: 14px 40px;
+      border: 1.5px solid var(--c-cyan);
+      color: var(--c-white);
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      box-shadow: 0 0 24px rgba(43,226,254,0.4), inset 0 0 24px rgba(43,226,254,0.08);
+      transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+    }
+    .overlay .cta:hover { background: rgba(43,226,254,0.1); box-shadow: 0 0 32px rgba(43,226,254,0.7); transform: translateY(-1px); }
+    .overlay .cta:active { transform: translateY(1px); }
+
+    .stat-row { display: flex; gap: 36px; flex-wrap: wrap; justify-content: center; }
+    .stat { display: flex; flex-direction: column; gap: 4px; }
+    .stat .lbl { font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase; opacity: 0.55; }
+    .stat .val { font-size: clamp(32px, 6vw, 48px); font-weight: 800; color: var(--c-white); text-shadow: 0 0 16px rgba(255,255,255,0.4); }
+    .stat .val.gold { color: var(--c-gold); text-shadow: 0 0 16px rgba(255,216,107,0.5); }
   </style>
 </head>
 <body>
+  <div id="reticle"></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div>
+        <div class="label">Score</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">Time</div>
+        <div class="value" id="timer">30.0</div>
+      </div>
+    </div>
+    <div class="hud-bonus" id="bonus"></div>
+  </div>
+
+  <div class="overlay" id="overlay-start">
+    <h1 class="title">KetsuRyu</h1>
+    <p class="subtitle">Pilot the celestial dragon · Catch lanterns · Hunt the phoenix · Survive</p>
+    <button class="cta" id="btn-start">Tap to start</button>
+    <p class="subtitle" style="opacity:0.4">Move mouse / drag finger to steer</p>
+  </div>
+
+  <div class="overlay hidden" id="overlay-end">
+    <h1 class="title" style="color:var(--c-red); text-shadow: 0 0 24px rgba(255,58,76,0.9), 0 0 48px rgba(255,58,76,0.4);">Time Up</h1>
+    <div class="stat-row">
+      <div class="stat"><div class="lbl">Score</div><div class="val" id="end-score">0</div></div>
+      <div class="stat"><div class="lbl">Best</div><div class="val gold" id="end-best">0</div></div>
+    </div>
+    <button class="cta" id="btn-restart">Tap to restart</button>
+  </div>
+
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+      "three":          "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/":  "https://unpkg.com/three@0.161.0/examples/jsm/"
     }
   }
   </script>
@@ -35,302 +180,896 @@
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
     import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
 
-    const COLOR_BG    = 0x050505;
-    const COLOR_CYAN  = 0x2be2fe;
-    const COLOR_WHITE = 0xffffff;
+    // ============================================================
+    //  CONFIG
+    // ============================================================
+    const COLOR = {
+      BG:      0x050505,
+      CYAN:    0x2be2fe,
+      WHITE:   0xffffff,
+      GOLD:    0xffd86b,
+      RED:     0xff3a4c,
+      MAGENTA: 0xff5fb1,
+      VIOLET:  0x4a2c8a,
+      DEEP:    0x0e1130,
+    };
 
-    // ---------- Scene / renderer ----------
+    const CFG = {
+      DRAGON: {
+        SEGMENTS: 70,
+        SEG_DIST: 0.55,
+        BASE_SPEED: 16,
+        MAX_SPEED:  44,
+        SPEED_RAMP: 0.012,   // per score point added
+        YAW_RATE:   1.7,
+        PITCH_RATE: 1.3,
+        PITCH_LIMIT: 0.85,
+      },
+      LANTERN: {
+        POOL: 26,
+        SPAWN_AHEAD: { min: 55, max: 110 },
+        SPREAD: 22,
+        VALUE: 10,
+        BONUS_TIME: 1.8,
+        RADIUS: 1.6,
+      },
+      PHOENIX: {
+        VALUE: 100,
+        BONUS_TIME: 5,
+        RADIUS: 2.2,
+        SPAWN_INTERVAL: { min: 9, max: 16 },
+      },
+      GAME: {
+        START_TIME: 30,
+        MAX_TIME:   60,
+      },
+    };
+
+    const STORAGE_BEST = 'ketsuryu_best';
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    const state = {
+      mode:    'menu',     // 'menu' | 'play' | 'over'
+      score:   0,
+      timeLeft: CFG.GAME.START_TIME,
+      best:    Number(localStorage.getItem(STORAGE_BEST) || 0),
+      pointer: { x: 0, y: 0, active: false },
+      yaw:     0,
+      pitch:   0,
+      speed:   CFG.DRAGON.BASE_SPEED,
+    };
+
+    // ============================================================
+    //  DOM
+    // ============================================================
+    const dom = {
+      reticle:  document.getElementById('reticle'),
+      score:    document.getElementById('score'),
+      timer:    document.getElementById('timer'),
+      bonus:    document.getElementById('bonus'),
+      start:    document.getElementById('overlay-start'),
+      end:      document.getElementById('overlay-end'),
+      endScore: document.getElementById('end-score'),
+      endBest:  document.getElementById('end-best'),
+      btnStart: document.getElementById('btn-start'),
+      btnRestart: document.getElementById('btn-restart'),
+    };
+
+    // ============================================================
+    //  RENDERER / SCENE / CAMERA
+    // ============================================================
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(COLOR_BG);
-    scene.fog = new THREE.Fog(COLOR_BG, 30, 90);
+    scene.background = new THREE.Color(COLOR.BG);
+    scene.fog = new THREE.Fog(0x2a1a4a, 60, 180);
 
-    const camera = new THREE.PerspectiveCamera(
-      45, window.innerWidth / window.innerHeight, 0.1, 200
-    );
-    camera.position.set(0, 0, 32);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 600);
+    camera.position.set(0, 4, 18);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     document.body.appendChild(renderer.domElement);
 
-    // ---------- Lights ----------
-    scene.add(new THREE.AmbientLight(0x223344, 0.6));
-
-    const keyLight = new THREE.DirectionalLight(0x88e8ff, 0.9);
-    keyLight.position.set(8, 10, 6);
-    scene.add(keyLight);
-
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    rimLight.position.set(-6, -4, -8);
-    scene.add(rimLight);
-
-    // Glow that follows the head a bit
-    const headLight = new THREE.PointLight(COLOR_CYAN, 2.0, 25, 1.6);
-    scene.add(headLight);
-
-    // ---------- Dragon spine ----------
-    const NUM_SEGMENTS    = 70;
-    const SEGMENT_DIST    = 0.55;       // target distance between consecutive joints
-    const HEAD_FOLLOW     = 0.06;       // how fast head chases its target
-
-    const spinePoints = [];
-    for (let i = 0; i < NUM_SEGMENTS; i++) {
-      spinePoints.push(new THREE.Vector3(-i * SEGMENT_DIST, 0, 0));
+    // ============================================================
+    //  SKYBOX (Shenmue dusk gradient)
+    // ============================================================
+    {
+      const skyGeo = new THREE.SphereGeometry(420, 32, 16);
+      const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          uTop:    { value: new THREE.Color(0x1f4dff) },
+          uMid:    { value: new THREE.Color(0xff6aa8) },
+          uBottom: { value: new THREE.Color(0x2a0e4a) },
+        },
+        vertexShader: /*glsl*/`
+          varying vec3 vWorld;
+          void main() {
+            vWorld = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /*glsl*/`
+          varying vec3 vWorld;
+          uniform vec3 uTop, uMid, uBottom;
+          void main() {
+            float h = normalize(vWorld).y;
+            vec3 col = mix(uBottom, uMid, smoothstep(-0.4, 0.15, h));
+            col = mix(col, uTop, smoothstep(0.05, 0.65, h));
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `,
+      });
+      scene.add(new THREE.Mesh(skyGeo, skyMat));
     }
 
-    const dragon   = new THREE.Group();
-    scene.add(dragon);
+    // ============================================================
+    //  LIGHTS
+    // ============================================================
+    scene.add(new THREE.AmbientLight(0x4a4070, 0.7));
 
-    // segment radius profile: head bigger, body steady, taper to tail
+    const keyLight = new THREE.DirectionalLight(0xffd1b3, 1.1);
+    keyLight.position.set(20, 30, 10);
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x55c8ff, 0.7);
+    rimLight.position.set(-10, -5, -20);
+    scene.add(rimLight);
+
+    const headLight = new THREE.PointLight(COLOR.CYAN, 2.4, 35, 1.6);
+    scene.add(headLight);
+
+    // ============================================================
+    //  LOW-POLY CLOUDS (Shenmue distance fillers)
+    // ============================================================
+    const cloudGroup = new THREE.Group();
+    scene.add(cloudGroup);
+    {
+      const cloudGeo = new THREE.IcosahedronGeometry(1, 0);
+      const cloudMat1 = new THREE.MeshLambertMaterial({ color: 0xffd0e8, flatShading: true });
+      const cloudMat2 = new THREE.MeshLambertMaterial({ color: 0xa8c8ff, flatShading: true });
+      for (let i = 0; i < 80; i++) {
+        const m = new THREE.Mesh(cloudGeo, Math.random() < 0.5 ? cloudMat1 : cloudMat2);
+        const r = 100 + Math.random() * 180;
+        const a = Math.random() * Math.PI * 2;
+        const y = (Math.random() - 0.3) * 90;
+        m.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+        const s = 4 + Math.random() * 10;
+        m.scale.set(s * (1 + Math.random()), s * 0.55, s * (1 + Math.random()));
+        m.rotation.y = Math.random() * Math.PI;
+        cloudGroup.add(m);
+      }
+    }
+
+    // ============================================================
+    //  DRAGON (rope-follow spine, cyan/white banded body)
+    // ============================================================
+    const cyanCol  = new THREE.Color(COLOR.CYAN);
+    const whiteCol = new THREE.Color(COLOR.WHITE);
+
+    const spinePoints = [];
+    for (let i = 0; i < CFG.DRAGON.SEGMENTS; i++) {
+      spinePoints.push(new THREE.Vector3(0, 4, i * CFG.DRAGON.SEG_DIST));
+    }
+
     function radiusFor(i) {
-      const n = NUM_SEGMENTS;
-      if (i === 0) return 0.95;            // head
-      if (i < 4)   return 0.85 - i * 0.05; // neck taper down
-      if (i < 12)  return 0.7;             // shoulders/body start
+      const n = CFG.DRAGON.SEGMENTS;
+      if (i === 0) return 0.95;
+      if (i < 4)   return 0.85 - i * 0.05;
+      if (i < 12)  return 0.7;
       const t = (i - 12) / (n - 12);
-      // gentle body bulge then taper
       const bulge = Math.sin(t * Math.PI) * 0.12;
       return Math.max(0.08, 0.7 + bulge - t * 0.62);
     }
 
+    const dragonGroup = new THREE.Group();
+    scene.add(dragonGroup);
     const segments = [];
-    const cyanCol  = new THREE.Color(COLOR_CYAN);
-    const whiteCol = new THREE.Color(COLOR_WHITE);
 
-    for (let i = 0; i < NUM_SEGMENTS; i++) {
-      const r   = radiusFor(i);
-      // Stretch slightly along forward axis so spheres overlap into a continuous body
-      const geo = new THREE.SphereGeometry(r, 24, 18);
-
-      // Alternate banding cyan / white along the body
-      const band = Math.sin(i * 0.55);
-      const col  = band > 0 ? cyanCol.clone() : whiteCol.clone();
-      const isCyan = band > 0;
-
+    for (let i = 0; i < CFG.DRAGON.SEGMENTS; i++) {
+      const r = radiusFor(i);
+      const isCyan = Math.sin(i * 0.55) > 0;
+      const col = isCyan ? cyanCol : whiteCol;
       const mat = new THREE.MeshPhysicalMaterial({
-        color:             col,
-        emissive:          col,
+        color: col,
+        emissive: col,
         emissiveIntensity: isCyan ? 0.55 : 0.35,
-        metalness:         0.45,
-        roughness:         0.22,
-        clearcoat:         0.9,
-        clearcoatRoughness:0.15,
+        metalness: 0.45,
+        roughness: 0.22,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.15,
       });
-
-      const mesh = new THREE.Mesh(geo, mat);
-      // Stretch along Z (the lookAt forward axis) for continuity
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat);
       mesh.scale.z = 1.35;
-      dragon.add(mesh);
+      dragonGroup.add(mesh);
       segments.push({ mesh, r });
 
-      // Dorsal spines (skip head, neck, very tail)
-      if (i > 4 && i < NUM_SEGMENTS - 6 && i % 2 === 0) {
-        const sg = new THREE.ConeGeometry(0.10, r * 1.5, 8);
-        const sm = new THREE.MeshPhysicalMaterial({
-          color: COLOR_WHITE,
-          emissive: COLOR_WHITE,
-          emissiveIntensity: 0.7,
-          metalness: 0.3,
-          roughness: 0.25,
-        });
-        const fin = new THREE.Mesh(sg, sm);
+      if (i > 4 && i < CFG.DRAGON.SEGMENTS - 6 && i % 2 === 0) {
+        const fin = new THREE.Mesh(
+          new THREE.ConeGeometry(0.10, r * 1.5, 8),
+          new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.7, metalness: 0.3, roughness: 0.25 })
+        );
         fin.position.y = r * 0.85;
         mesh.add(fin);
       }
     }
 
-    // ---------- Head decorations ----------
+    // Head decorations
     const head = segments[0].mesh;
     const headR = segments[0].r;
+    {
+      const eyeGeo = new THREE.SphereGeometry(0.13, 12, 12);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: COLOR.WHITE });
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.42, 0.32, -0.55);
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set( 0.42, 0.32, -0.55);
+      head.add(eyeL); head.add(eyeR);
+      const pupGeo = new THREE.SphereGeometry(0.06, 10, 10);
+      const pupMat = new THREE.MeshBasicMaterial({ color: 0x041020 });
+      const pupL = new THREE.Mesh(pupGeo, pupMat); pupL.position.set(-0.42, 0.32, -0.66);
+      const pupR = new THREE.Mesh(pupGeo, pupMat); pupR.position.set( 0.42, 0.32, -0.66);
+      head.add(pupL); head.add(pupR);
 
-    // Eyes (glowing white)
-    const eyeGeo = new THREE.SphereGeometry(0.13, 16, 16);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: COLOR_WHITE });
-    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.42, 0.32, -0.55);
-    eyeR.position.set( 0.42, 0.32, -0.55);
-    head.add(eyeL); head.add(eyeR);
-
-    // Pupils
-    const pupGeo = new THREE.SphereGeometry(0.06, 12, 12);
-    const pupMat = new THREE.MeshBasicMaterial({ color: 0x041020 });
-    const pupL = new THREE.Mesh(pupGeo, pupMat);
-    const pupR = new THREE.Mesh(pupGeo, pupMat);
-    pupL.position.set(-0.42, 0.32, -0.66);
-    pupR.position.set( 0.42, 0.32, -0.66);
-    head.add(pupL); head.add(pupR);
-
-    // Horns: curved antlers built from a few cones
-    function makeHorn(side) {
-      const horn = new THREE.Group();
-      const segs = 4;
-      let prevTop = new THREE.Vector3(0, 0, 0);
-      for (let i = 0; i < segs; i++) {
-        const len = 0.55 - i * 0.08;
-        const rad = 0.10 - i * 0.018;
-        const cg = new THREE.ConeGeometry(rad, len, 10);
-        const cm = new THREE.MeshPhysicalMaterial({
-          color: COLOR_WHITE, emissive: COLOR_WHITE, emissiveIntensity: 0.5,
-          metalness: 0.3, roughness: 0.35
-        });
-        const c = new THREE.Mesh(cg, cm);
-        c.position.copy(prevTop);
-        c.position.y += len * 0.5;
-        c.position.x += side * (i * 0.08);
-        c.position.z -= i * 0.05;
-        c.rotation.z = side * (0.25 + i * 0.12);
-        horn.add(c);
-        prevTop = new THREE.Vector3(c.position.x + side * 0.08, c.position.y + len * 0.5, c.position.z);
+      function makeHorn(side) {
+        const horn = new THREE.Group();
+        let prev = new THREE.Vector3();
+        for (let i = 0; i < 4; i++) {
+          const len = 0.55 - i * 0.08;
+          const rad = 0.10 - i * 0.018;
+          const c = new THREE.Mesh(
+            new THREE.ConeGeometry(rad, len, 8),
+            new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.5, metalness: 0.3, roughness: 0.35 })
+          );
+          c.position.copy(prev);
+          c.position.y += len * 0.5;
+          c.position.x += side * (i * 0.08);
+          c.position.z -= i * 0.05;
+          c.rotation.z = side * (0.25 + i * 0.12);
+          horn.add(c);
+          prev = new THREE.Vector3(c.position.x + side * 0.08, c.position.y + len * 0.5, c.position.z);
+        }
+        return horn;
       }
-      return horn;
-    }
-    const hornL = makeHorn(-1); hornL.position.set(-0.25, headR * 0.55, 0.05); head.add(hornL);
-    const hornR = makeHorn( 1); hornR.position.set( 0.25, headR * 0.55, 0.05); head.add(hornR);
+      const hL = makeHorn(-1); hL.position.set(-0.25, headR * 0.55, 0.05); head.add(hL);
+      const hR = makeHorn( 1); hR.position.set( 0.25, headR * 0.55, 0.05); head.add(hR);
 
-    // Snout / nose nub
-    const snoutGeo = new THREE.SphereGeometry(0.55, 18, 14);
-    const snoutMat = new THREE.MeshPhysicalMaterial({
-      color: COLOR_CYAN, emissive: COLOR_CYAN, emissiveIntensity: 0.5,
-      metalness: 0.4, roughness: 0.25, clearcoat: 0.8
-    });
-    const snout = new THREE.Mesh(snoutGeo, snoutMat);
-    snout.scale.set(0.85, 0.7, 1.1);
-    snout.position.set(0, -0.05, -0.85);
-    head.add(snout);
-
-    // Mane: a tuft of small white spheres behind the horns
-    const maneGroup = new THREE.Group();
-    head.add(maneGroup);
-    for (let i = 0; i < 14; i++) {
-      const mg = new THREE.SphereGeometry(0.18 + Math.random() * 0.08, 10, 8);
-      const mm = new THREE.MeshPhysicalMaterial({
-        color: i % 2 ? COLOR_WHITE : COLOR_CYAN,
-        emissive: i % 2 ? COLOR_WHITE : COLOR_CYAN,
-        emissiveIntensity: 0.45,
-        roughness: 0.4, metalness: 0.2,
-      });
-      const m = new THREE.Mesh(mg, mm);
-      m.position.set(
-        (Math.random() - 0.5) * 0.7,
-        0.55 + Math.random() * 0.3,
-        0.3 + Math.random() * 0.5
+      const snout = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55, 14, 10),
+        new THREE.MeshPhysicalMaterial({ color: COLOR.CYAN, emissive: COLOR.CYAN, emissiveIntensity: 0.5, metalness: 0.4, roughness: 0.25, clearcoat: 0.8 })
       );
-      maneGroup.add(m);
+      snout.scale.set(0.85, 0.7, 1.1);
+      snout.position.set(0, -0.05, -0.85);
+      head.add(snout);
+
+      // Mane
+      for (let i = 0; i < 14; i++) {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(0.18 + Math.random() * 0.08, 8, 8),
+          new THREE.MeshPhysicalMaterial({
+            color: i % 2 ? COLOR.WHITE : COLOR.CYAN,
+            emissive: i % 2 ? COLOR.WHITE : COLOR.CYAN,
+            emissiveIntensity: 0.45,
+            roughness: 0.4, metalness: 0.2,
+          })
+        );
+        m.position.set((Math.random()-0.5)*0.7, 0.55 + Math.random()*0.3, 0.3 + Math.random()*0.5);
+        head.add(m);
+      }
     }
 
-    // ---------- Whiskers (rebuilt each frame for flowing motion) ----------
-    function makeWhiskerMesh() {
-      const mat = new THREE.MeshPhysicalMaterial({
-        color: COLOR_WHITE,
-        emissive: COLOR_WHITE,
-        emissiveIntensity: 0.7,
-        metalness: 0.2,
-        roughness: 0.3,
-      });
-      const placeholder = new THREE.BufferGeometry();
-      const m = new THREE.Mesh(placeholder, mat);
-      head.add(m);
-      return m;
+    // Whiskers
+    function makeWhisker() {
+      const mat = new THREE.MeshPhysicalMaterial({ color: COLOR.WHITE, emissive: COLOR.WHITE, emissiveIntensity: 0.7, metalness: 0.2, roughness: 0.3 });
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      head.add(mesh);
+      return mesh;
     }
-    const whiskerL = makeWhiskerMesh();
-    const whiskerR = makeWhiskerMesh();
-
+    const whiskerL = makeWhisker();
+    const whiskerR = makeWhisker();
     function rebuildWhisker(mesh, side, t) {
       const pts = [];
-      const N = 24;
-      for (let i = 0; i <= N; i++) {
-        const u = i / N;
-        // start near snout, sweep backwards along -Z
+      for (let i = 0; i <= 20; i++) {
+        const u = i / 20;
         const z = -0.9 - u * 4.5;
         const wave = Math.sin(t * 3 + u * 6 + side) * 0.55 * u;
         const drop = -u * 0.6;
         pts.push(new THREE.Vector3(side * (0.25 + u * 0.6 + wave * 0.3), drop + wave * 0.4, z));
       }
       const curve = new THREE.CatmullRomCurve3(pts);
-      const newGeo = new THREE.TubeGeometry(curve, 32, 0.04, 6, false);
+      const newGeo = new THREE.TubeGeometry(curve, 24, 0.04, 5, false);
       mesh.geometry.dispose();
       mesh.geometry = newGeo;
     }
 
-    // ---------- Animation ----------
-    const targetPos = new THREE.Vector3();
-    const tmp       = new THREE.Vector3();
+    // ============================================================
+    //  LANTERN
+    // ============================================================
+    function buildLantern() {
+      const g = new THREE.Group();
+
+      // Body (red lantern, slightly squashed sphere)
+      const body = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 18, 12),
+        new THREE.MeshStandardMaterial({
+          color: COLOR.RED, emissive: 0xff5555, emissiveIntensity: 0.9,
+          roughness: 0.55, metalness: 0.1, flatShading: true,
+        })
+      );
+      body.scale.set(1, 0.78, 1);
+      g.add(body);
+
+      // Gold caps
+      const capMat = new THREE.MeshStandardMaterial({
+        color: COLOR.GOLD, emissive: 0x664422, emissiveIntensity: 0.4,
+        metalness: 0.7, roughness: 0.3, flatShading: true,
+      });
+      const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 0.18, 14), capMat);
+      cap1.position.y =  0.78;
+      const cap2 = cap1.clone();
+      cap2.position.y = -0.78;
+      g.add(cap1); g.add(cap2);
+
+      // Tassel
+      const tasselMat = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0x886622, emissiveIntensity: 0.6, metalness: 0.5, roughness: 0.4 });
+      const tasselTop = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 6), tasselMat);
+      tasselTop.position.y = -1.05;
+      const tasselBot = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 8), tasselMat);
+      tasselBot.position.y = -1.45;
+      g.add(tasselTop); g.add(tasselBot);
+
+      // Inner glow point light (cheap, only 1 active per lantern works fine)
+      const glow = new THREE.PointLight(0xff5544, 0.9, 8, 2);
+      g.add(glow);
+
+      g.userData = {
+        active: false,
+        bobPhase: 0,
+        spinSpeed: 0,
+        riseSpeed: 0,
+      };
+      g.visible = false;
+      return g;
+    }
+
+    const lanternPool = [];
+    for (let i = 0; i < CFG.LANTERN.POOL; i++) {
+      const l = buildLantern();
+      scene.add(l);
+      lanternPool.push(l);
+    }
+
+    function spawnLantern() {
+      const l = lanternPool.find(o => !o.userData.active);
+      if (!l) return;
+      const head = spinePoints[0];
+      const fwd  = direction.clone();
+      const dist = THREE.MathUtils.lerp(CFG.LANTERN.SPAWN_AHEAD.min, CFG.LANTERN.SPAWN_AHEAD.max, Math.random());
+      // basis perpendicular to forward
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+      const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
+      const offX  = (Math.random() - 0.5) * 2 * CFG.LANTERN.SPREAD;
+      const offY  = (Math.random() - 0.4) * 2 * CFG.LANTERN.SPREAD * 0.7;
+      l.position.copy(head)
+        .addScaledVector(fwd,   dist)
+        .addScaledVector(right, offX)
+        .addScaledVector(up,    offY);
+      l.userData.active    = true;
+      l.userData.bobPhase  = Math.random() * Math.PI * 2;
+      l.userData.spinSpeed = (Math.random() - 0.5) * 0.6;
+      l.userData.riseSpeed = 0.4 + Math.random() * 0.6;
+      l.visible = true;
+    }
+
+    function recycleLantern(l) {
+      l.userData.active = false;
+      l.visible = false;
+    }
+
+    // ============================================================
+    //  PHOENIX
+    // ============================================================
+    function buildPhoenix() {
+      const g = new THREE.Group();
+
+      const bodyMat  = new THREE.MeshStandardMaterial({ color: 0xff5a2c, emissive: 0xff7733, emissiveIntensity: 0.9, metalness: 0.4, roughness: 0.35, flatShading: true });
+      const goldMat  = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0xffaa33, emissiveIntensity: 1.0, metalness: 0.6, roughness: 0.3, flatShading: true });
+      const wingMat  = new THREE.MeshStandardMaterial({ color: 0xff3a4c, emissive: 0xff6688, emissiveIntensity: 0.85, metalness: 0.3, roughness: 0.4, side: THREE.DoubleSide, flatShading: true });
+      const tailMat1 = new THREE.MeshStandardMaterial({ color: 0xff3a4c, emissive: 0xff5566, emissiveIntensity: 0.9, flatShading: true });
+      const tailMat2 = new THREE.MeshStandardMaterial({ color: COLOR.GOLD, emissive: 0xffcc55, emissiveIntensity: 1.0, flatShading: true });
+
+      // Body
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 10), bodyMat);
+      body.scale.set(0.85, 0.7, 1.4);
+      g.add(body);
+
+      // Head
+      const headM = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), bodyMat);
+      headM.position.set(0, 0.35, 1.1);
+      g.add(headM);
+
+      // Beak
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 8), goldMat);
+      beak.rotation.x = Math.PI / 2;
+      beak.position.set(0, 0.3, 1.7);
+      g.add(beak);
+
+      // Crest
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.7, 6), goldMat);
+      crest.position.set(0, 0.85, 1.0);
+      crest.rotation.x = -0.4;
+      g.add(crest);
+
+      // Eyes
+      const eye = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const eL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eye);
+      const eR = eL.clone();
+      eL.position.set(-0.22, 0.42, 1.45);
+      eR.position.set( 0.22, 0.42, 1.45);
+      g.add(eL); g.add(eR);
+
+      // Wings (animated)
+      const wingShape = new THREE.Shape();
+      wingShape.moveTo(0, 0);
+      wingShape.lineTo(2.6, 0.3);
+      wingShape.lineTo(2.9, -0.4);
+      wingShape.lineTo(2.0, -0.6);
+      wingShape.lineTo(0.6, -0.3);
+      wingShape.lineTo(0, 0);
+      const wingGeo = new THREE.ShapeGeometry(wingShape);
+      const wingL = new THREE.Mesh(wingGeo, wingMat);
+      const wingR = new THREE.Mesh(wingGeo, wingMat);
+      wingL.position.set(-0.5, 0.1, 0.0);
+      wingR.position.set( 0.5, 0.1, 0.0);
+      wingR.scale.x = -1;
+      g.add(wingL); g.add(wingR);
+
+      // Tail feathers
+      const tailGroup = new THREE.Group();
+      tailGroup.position.set(0, 0, -1.1);
+      for (let i = 0; i < 7; i++) {
+        const t = i / 6;
+        const feather = new THREE.Mesh(
+          new THREE.ConeGeometry(0.18 - t * 0.06, 2.4 + t * 0.4, 6),
+          i % 2 ? tailMat2 : tailMat1
+        );
+        feather.rotation.x = Math.PI / 2;
+        feather.position.set((t - 0.5) * 1.4, (i % 2) * 0.15, -1.0);
+        feather.rotation.z = (t - 0.5) * 0.5;
+        tailGroup.add(feather);
+      }
+      g.add(tailGroup);
+
+      // Glow
+      const glow = new THREE.PointLight(0xff7744, 2.0, 18, 2);
+      g.add(glow);
+
+      g.userData = {
+        active:    false,
+        wingL:     wingL,
+        wingR:     wingR,
+        tail:      tailGroup,
+        startPos:  new THREE.Vector3(),
+        endPos:    new THREE.Vector3(),
+        t:         0,
+        duration:  6,
+      };
+      g.visible = false;
+      return g;
+    }
+
+    const phoenix = buildPhoenix();
+    scene.add(phoenix);
+    let nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max);
+
+    function spawnPhoenix() {
+      const head = spinePoints[0];
+      const fwd  = direction.clone();
+      const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+      const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
+      // start from one side, end at the other, passing in front of player
+      const side  = Math.random() < 0.5 ? -1 : 1;
+      const dist  = 80;
+      phoenix.userData.startPos.copy(head)
+        .addScaledVector(fwd,   dist)
+        .addScaledVector(right, side * 60)
+        .addScaledVector(up,    (Math.random() - 0.3) * 14);
+      phoenix.userData.endPos.copy(head)
+        .addScaledVector(fwd,   dist + 30)
+        .addScaledVector(right, -side * 60)
+        .addScaledVector(up,    (Math.random() - 0.3) * 14);
+      phoenix.userData.t = 0;
+      phoenix.userData.duration = 7 + Math.random() * 3;
+      phoenix.userData.active = true;
+      phoenix.position.copy(phoenix.userData.startPos);
+      phoenix.visible = true;
+    }
+
+    // ============================================================
+    //  COLLECT BURSTS (visual feedback)
+    // ============================================================
+    const burstPool = [];
+    function buildBurst() {
+      const g = new THREE.Group();
+      const parts = [];
+      for (let i = 0; i < 12; i++) {
+        const m = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(0.28, 0),
+          new THREE.MeshBasicMaterial({ color: COLOR.WHITE, transparent: true })
+        );
+        const v = new THREE.Vector3(
+          Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5
+        ).normalize().multiplyScalar(8 + Math.random() * 6);
+        parts.push({ mesh: m, vel: v });
+        g.add(m);
+      }
+      g.userData = { active: false, t: 0, life: 0.7, parts };
+      g.visible = false;
+      scene.add(g);
+      return g;
+    }
+    for (let i = 0; i < 6; i++) burstPool.push(buildBurst());
+
+    function triggerBurst(pos, color) {
+      const b = burstPool.find(b => !b.userData.active);
+      if (!b) return;
+      b.position.copy(pos);
+      b.userData.active = true;
+      b.userData.t = 0;
+      const c = new THREE.Color(color);
+      for (const p of b.userData.parts) {
+        p.mesh.material.color.copy(c);
+        p.mesh.material.opacity = 1;
+        p.mesh.position.set(0,0,0);
+        p.mesh.scale.setScalar(1);
+      }
+      b.visible = true;
+    }
+
+    function updateBursts(dt) {
+      for (const b of burstPool) {
+        if (!b.userData.active) continue;
+        b.userData.t += dt;
+        const u = b.userData.t / b.userData.life;
+        if (u >= 1) { b.userData.active = false; b.visible = false; continue; }
+        for (const p of b.userData.parts) {
+          p.mesh.position.addScaledVector(p.vel, dt);
+          p.mesh.material.opacity = 1 - u;
+          p.mesh.scale.setScalar(1 - u * 0.5);
+        }
+      }
+    }
+
+    // ============================================================
+    //  INPUT (pointer = mouse + touch)
+    // ============================================================
+    const pointer = state.pointer;
+
+    function setPointerFromEvent(e) {
+      pointer.x = (e.clientX / innerWidth)  * 2 - 1;
+      pointer.y = (e.clientY / innerHeight) * 2 - 1;
+      dom.reticle.style.left = e.clientX + 'px';
+      dom.reticle.style.top  = e.clientY + 'px';
+    }
+
+    addEventListener('pointermove', (e) => {
+      pointer.active = true;
+      setPointerFromEvent(e);
+      dom.reticle.style.opacity = state.mode === 'play' ? '1' : '0';
+    }, { passive: true });
+
+    addEventListener('pointerdown', (e) => {
+      pointer.active = true;
+      setPointerFromEvent(e);
+    }, { passive: true });
+
+    addEventListener('pointerup', () => {
+      // On touch (no hover), recenter when finger lifts
+      if (matchMedia('(hover: none)').matches) {
+        pointer.active = false;
+      }
+    });
+
+    addEventListener('pointerleave', () => { pointer.active = false; });
+
+    // ============================================================
+    //  GAME FLOW
+    // ============================================================
+    function startGame() {
+      state.mode      = 'play';
+      state.score     = 0;
+      state.timeLeft  = CFG.GAME.START_TIME;
+      state.speed     = CFG.DRAGON.BASE_SPEED;
+      state.yaw       = 0;
+      state.pitch     = 0;
+      // Reset spine in front of camera, pointing forward
+      for (let i = 0; i < spinePoints.length; i++) {
+        spinePoints[i].set(0, 4, i * CFG.DRAGON.SEG_DIST);
+      }
+      // Clear lanterns / phoenix
+      lanternPool.forEach(recycleLantern);
+      phoenix.userData.active = false;
+      phoenix.visible = false;
+      nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max);
+
+      // Pre-populate a few lanterns
+      direction.set(0, 0, -1);
+      for (let i = 0; i < 8; i++) spawnLantern();
+
+      dom.start.classList.add('hidden');
+      dom.end.classList.add('hidden');
+      dom.reticle.style.opacity = '1';
+      updateHUD();
+    }
+
+    function endGame() {
+      state.mode = 'over';
+      if (state.score > state.best) {
+        state.best = state.score;
+        localStorage.setItem(STORAGE_BEST, String(state.best));
+      }
+      dom.endScore.textContent = state.score;
+      dom.endBest.textContent  = state.best;
+      dom.end.classList.remove('hidden');
+      dom.reticle.style.opacity = '0';
+    }
+
+    function showBonus(text, color) {
+      dom.bonus.textContent = text;
+      dom.bonus.style.color = color;
+      dom.bonus.classList.remove('show');
+      void dom.bonus.offsetWidth;
+      dom.bonus.classList.add('show');
+      clearTimeout(showBonus._to);
+      showBonus._to = setTimeout(() => dom.bonus.classList.remove('show'), 700);
+    }
+
+    function updateHUD() {
+      dom.score.textContent = state.score;
+      const t = Math.max(0, state.timeLeft);
+      dom.timer.textContent = t.toFixed(1);
+      dom.timer.classList.toggle('warn', t < 5);
+    }
+
+    dom.btnStart.addEventListener('click', startGame);
+    dom.btnRestart.addEventListener('click', startGame);
+
+    // ============================================================
+    //  GAME LOOP
+    // ============================================================
+    const direction = new THREE.Vector3(0, 0, -1);
+    const tmpVec    = new THREE.Vector3();
+    const camTarget = new THREE.Vector3();
+    const camLook   = new THREE.Vector3();
     const clock     = new THREE.Clock();
     let time = 0;
 
-    function animate() {
-      requestAnimationFrame(animate);
-      const dt = Math.min(clock.getDelta(), 1 / 30);
-      time += dt;
+    function randRange(a, b) { return a + Math.random() * (b - a); }
 
-      // Head target: a complex 3D Lissajous so the dragon roams the scene
-      const A = 11, B = 6, C = 5;
-      targetPos.set(
-        Math.sin(time * 0.55) * A + Math.cos(time * 0.21) * 3,
-        Math.sin(time * 0.43) * B + Math.cos(time * 0.77) * 2,
-        Math.sin(time * 0.31) * C + Math.cos(time * 0.92) * 2
+    function updateDragon(dt) {
+      // Steering: pointer position drives angular rate
+      const px = pointer.active ? pointer.x : 0;
+      const py = pointer.active ? pointer.y : 0;
+      // Dead-zone for stability
+      const dz = 0.05;
+      const sx = Math.abs(px) < dz ? 0 : px;
+      const sy = Math.abs(py) < dz ? 0 : py;
+
+      state.yaw   -= sx * CFG.DRAGON.YAW_RATE * dt;
+      state.pitch -= sy * CFG.DRAGON.PITCH_RATE * dt;
+      state.pitch = THREE.MathUtils.clamp(state.pitch, -CFG.DRAGON.PITCH_LIMIT, CFG.DRAGON.PITCH_LIMIT);
+
+      direction.set(
+        -Math.sin(state.yaw) * Math.cos(state.pitch),
+         Math.sin(state.pitch),
+        -Math.cos(state.yaw) * Math.cos(state.pitch),
       );
 
-      // Head chases target smoothly
-      spinePoints[0].lerp(targetPos, HEAD_FOLLOW);
+      // Speed ramps with score
+      state.speed = Math.min(
+        CFG.DRAGON.MAX_SPEED,
+        CFG.DRAGON.BASE_SPEED + state.score * CFG.DRAGON.SPEED_RAMP
+      );
 
-      // Each subsequent joint follows the previous, keeping max distance
+      // Move head
+      spinePoints[0].addScaledVector(direction, state.speed * dt);
+
+      // Rope-follow body
       for (let i = 1; i < spinePoints.length; i++) {
         const prev = spinePoints[i - 1];
         const curr = spinePoints[i];
-        tmp.subVectors(curr, prev);
-        const d = tmp.length();
-        if (d > SEGMENT_DIST || d < 1e-4) {
-          if (d < 1e-4) tmp.set(0, 0, SEGMENT_DIST);
-          else          tmp.multiplyScalar(SEGMENT_DIST / d);
-          curr.copy(prev).add(tmp);
+        tmpVec.subVectors(curr, prev);
+        const d = tmpVec.length();
+        if (d > CFG.DRAGON.SEG_DIST || d < 1e-4) {
+          if (d < 1e-4) tmpVec.set(0, 0, CFG.DRAGON.SEG_DIST);
+          else          tmpVec.multiplyScalar(CFG.DRAGON.SEG_DIST / d);
+          curr.copy(prev).add(tmpVec);
         }
       }
 
-      // Place each mesh and orient toward the joint in front
+      // Apply to meshes + look-at
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         seg.mesh.position.copy(spinePoints[i]);
-        const lookTarget = (i === 0) ? targetPos : spinePoints[i - 1];
-        seg.mesh.lookAt(lookTarget);
+        const lookAt = (i === 0)
+          ? tmpVec.copy(spinePoints[0]).addScaledVector(direction, 1)
+          : spinePoints[i - 1];
+        seg.mesh.lookAt(lookAt);
       }
 
-      // Sync the head spotlight
       headLight.position.copy(spinePoints[0]);
 
-      // Whiskers wave
+      // Whiskers
       rebuildWhisker(whiskerL, -1, time);
       rebuildWhisker(whiskerR,  1, time);
+    }
 
-      // Subtle camera drift for cinematic feel
-      const cr = 4;
-      camera.position.x = Math.sin(time * 0.07) * cr;
-      camera.position.y = Math.cos(time * 0.05) * cr * 0.5;
-      camera.position.z = 32 + Math.sin(time * 0.09) * 3;
-      camera.lookAt(0, 0, 0);
+    function updateCamera(dt) {
+      const head = spinePoints[0];
+      // Position behind head, slightly above
+      camTarget.copy(head)
+        .addScaledVector(direction, -10)
+        .add(new THREE.Vector3(0, 2.2, 0));
+      camera.position.lerp(camTarget, 1 - Math.exp(-dt * 4));
+      camLook.copy(head).addScaledVector(direction, 6);
+      camera.lookAt(camLook);
+    }
+
+    function updateLanterns(dt) {
+      const head = spinePoints[0];
+      for (const l of lanternPool) {
+        if (!l.userData.active) continue;
+        l.userData.bobPhase += dt;
+        l.position.y += l.userData.riseSpeed * dt;
+        l.position.x += Math.sin(l.userData.bobPhase * 0.7) * 0.3 * dt;
+        l.rotation.y += l.userData.spinSpeed * dt;
+
+        // Recycle if behind dragon (dot product < 0 and far)
+        tmpVec.subVectors(l.position, head);
+        const fwdDot = tmpVec.dot(direction);
+        if (fwdDot < -25 || tmpVec.length() > 220) {
+          recycleLantern(l);
+          continue;
+        }
+
+        // Collision
+        if (tmpVec.length() < CFG.LANTERN.RADIUS + 1.2) {
+          recycleLantern(l);
+          state.score += CFG.LANTERN.VALUE;
+          state.timeLeft = Math.min(CFG.GAME.MAX_TIME, state.timeLeft + CFG.LANTERN.BONUS_TIME);
+          triggerBurst(l.position, COLOR.RED);
+          showBonus('+' + CFG.LANTERN.VALUE, '#ff6677');
+          updateHUD();
+        }
+      }
+
+      // Maintain a population
+      const active = lanternPool.filter(l => l.userData.active).length;
+      const target = 8 + Math.min(10, Math.floor(state.score / 60));
+      if (active < target) spawnLantern();
+    }
+
+    function updatePhoenix(dt) {
+      if (phoenix.userData.active) {
+        phoenix.userData.t += dt;
+        const u = phoenix.userData.t / phoenix.userData.duration;
+        if (u >= 1) { phoenix.userData.active = false; phoenix.visible = false; return; }
+        // Curved path: lerp + sin lift
+        phoenix.position.lerpVectors(phoenix.userData.startPos, phoenix.userData.endPos, u);
+        phoenix.position.y += Math.sin(u * Math.PI) * 8;
+        // Face direction of travel
+        tmpVec.copy(phoenix.userData.endPos).sub(phoenix.userData.startPos);
+        phoenix.lookAt(phoenix.position.clone().add(tmpVec));
+        // Wing flap
+        const flap = Math.sin(time * 14) * 0.7;
+        phoenix.userData.wingL.rotation.y =  flap;
+        phoenix.userData.wingR.rotation.y = -flap;
+        phoenix.userData.tail.rotation.x = Math.sin(time * 8) * 0.15;
+
+        // Collision
+        tmpVec.subVectors(phoenix.position, spinePoints[0]);
+        if (tmpVec.length() < CFG.PHOENIX.RADIUS + 1.4) {
+          state.score += CFG.PHOENIX.VALUE;
+          state.timeLeft = Math.min(CFG.GAME.MAX_TIME, state.timeLeft + CFG.PHOENIX.BONUS_TIME);
+          triggerBurst(phoenix.position, COLOR.GOLD);
+          triggerBurst(phoenix.position, COLOR.RED);
+          showBonus('PHOENIX +' + CFG.PHOENIX.VALUE, '#ffd86b');
+          phoenix.userData.active = false;
+          phoenix.visible = false;
+          updateHUD();
+        }
+      } else {
+        nextPhoenixIn -= dt;
+        if (nextPhoenixIn <= 0) {
+          spawnPhoenix();
+          // Subsequent phoenixes get a bit more frequent at high score
+          const factor = Math.max(0.5, 1 - state.score * 0.0008);
+          nextPhoenixIn = randRange(CFG.PHOENIX.SPAWN_INTERVAL.min, CFG.PHOENIX.SPAWN_INTERVAL.max) * factor;
+        }
+      }
+    }
+
+    function updateClouds() {
+      // Keep clouds anchored relative to dragon so the world feels infinite
+      cloudGroup.position.copy(spinePoints[0]);
+    }
+
+    function tick() {
+      requestAnimationFrame(tick);
+      const dt = Math.min(clock.getDelta(), 1 / 30);
+      time += dt;
+
+      if (state.mode === 'play') {
+        updateDragon(dt);
+        updateLanterns(dt);
+        updatePhoenix(dt);
+        updateCamera(dt);
+        updateClouds();
+        updateBursts(dt);
+
+        state.timeLeft -= dt;
+        if (state.timeLeft <= 0) {
+          state.timeLeft = 0;
+          updateHUD();
+          endGame();
+        } else {
+          // Update HUD only ~10x/s to save layout
+          if ((time * 10 | 0) !== (tick._lastTick | 0)) {
+            updateHUD();
+            tick._lastTick = time * 10 | 0;
+          }
+        }
+      } else {
+        // Idle scene: gently drift dragon and camera
+        spinePoints[0].x = Math.sin(time * 0.3) * 6;
+        spinePoints[0].y = 4 + Math.sin(time * 0.4) * 1.5;
+        spinePoints[0].z -= 4 * dt;
+        for (let i = 1; i < spinePoints.length; i++) {
+          const prev = spinePoints[i-1], curr = spinePoints[i];
+          tmpVec.subVectors(curr, prev);
+          const d = tmpVec.length();
+          if (d > CFG.DRAGON.SEG_DIST || d < 1e-4) {
+            if (d < 1e-4) tmpVec.set(0,0,CFG.DRAGON.SEG_DIST);
+            else          tmpVec.multiplyScalar(CFG.DRAGON.SEG_DIST / d);
+            curr.copy(prev).add(tmpVec);
+          }
+        }
+        for (let i = 0; i < segments.length; i++) {
+          segments[i].mesh.position.copy(spinePoints[i]);
+          const lookAt = i === 0 ? spinePoints[0].clone().add(new THREE.Vector3(0,0,-1)) : spinePoints[i-1];
+          segments[i].mesh.lookAt(lookAt);
+        }
+        headLight.position.copy(spinePoints[0]);
+        rebuildWhisker(whiskerL, -1, time);
+        rebuildWhisker(whiskerR,  1, time);
+        // Idle camera follows dragon side-on
+        const head = spinePoints[0];
+        camTarget.set(head.x + Math.cos(time * 0.2) * 14, head.y + 2, head.z + 14);
+        camera.position.lerp(camTarget, 1 - Math.exp(-dt * 1.4));
+        camera.lookAt(head);
+        updateClouds();
+      }
 
       composer.render();
     }
 
-    // ---------- Postprocessing (bloom for glow) ----------
+    // ============================================================
+    //  POST PROCESSING
+    // ============================================================
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.85,   // strength
-      0.55,   // radius
-      0.05    // threshold
-    );
+    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 0.08);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
 
-    // ---------- Resize ----------
-    window.addEventListener('resize', () => {
-      const w = window.innerWidth, h = window.innerHeight;
+    // ============================================================
+    //  RESIZE
+    // ============================================================
+    addEventListener('resize', () => {
+      const w = innerWidth, h = innerHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -338,7 +1077,10 @@
       bloom.setSize(w, h);
     });
 
-    animate();
+    // ============================================================
+    //  START
+    // ============================================================
+    tick();
   </script>
 </body>
 </html>
