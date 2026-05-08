@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ketsuryu — Dragon</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #050505;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
+
+    const COLOR_BG    = 0x050505;
+    const COLOR_CYAN  = 0x2be2fe;
+    const COLOR_WHITE = 0xffffff;
+
+    // ---------- Scene / renderer ----------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(COLOR_BG);
+    scene.fog = new THREE.Fog(COLOR_BG, 30, 90);
+
+    const camera = new THREE.PerspectiveCamera(
+      45, window.innerWidth / window.innerHeight, 0.1, 200
+    );
+    camera.position.set(0, 0, 32);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    document.body.appendChild(renderer.domElement);
+
+    // ---------- Lights ----------
+    scene.add(new THREE.AmbientLight(0x223344, 0.6));
+
+    const keyLight = new THREE.DirectionalLight(0x88e8ff, 0.9);
+    keyLight.position.set(8, 10, 6);
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    rimLight.position.set(-6, -4, -8);
+    scene.add(rimLight);
+
+    // Glow that follows the head a bit
+    const headLight = new THREE.PointLight(COLOR_CYAN, 2.0, 25, 1.6);
+    scene.add(headLight);
+
+    // ---------- Dragon spine ----------
+    const NUM_SEGMENTS    = 70;
+    const SEGMENT_DIST    = 0.55;       // target distance between consecutive joints
+    const HEAD_FOLLOW     = 0.06;       // how fast head chases its target
+
+    const spinePoints = [];
+    for (let i = 0; i < NUM_SEGMENTS; i++) {
+      spinePoints.push(new THREE.Vector3(-i * SEGMENT_DIST, 0, 0));
+    }
+
+    const dragon   = new THREE.Group();
+    scene.add(dragon);
+
+    // segment radius profile: head bigger, body steady, taper to tail
+    function radiusFor(i) {
+      const n = NUM_SEGMENTS;
+      if (i === 0) return 0.95;            // head
+      if (i < 4)   return 0.85 - i * 0.05; // neck taper down
+      if (i < 12)  return 0.7;             // shoulders/body start
+      const t = (i - 12) / (n - 12);
+      // gentle body bulge then taper
+      const bulge = Math.sin(t * Math.PI) * 0.12;
+      return Math.max(0.08, 0.7 + bulge - t * 0.62);
+    }
+
+    const segments = [];
+    const cyanCol  = new THREE.Color(COLOR_CYAN);
+    const whiteCol = new THREE.Color(COLOR_WHITE);
+
+    for (let i = 0; i < NUM_SEGMENTS; i++) {
+      const r   = radiusFor(i);
+      // Stretch slightly along forward axis so spheres overlap into a continuous body
+      const geo = new THREE.SphereGeometry(r, 24, 18);
+
+      // Alternate banding cyan / white along the body
+      const band = Math.sin(i * 0.55);
+      const col  = band > 0 ? cyanCol.clone() : whiteCol.clone();
+      const isCyan = band > 0;
+
+      const mat = new THREE.MeshPhysicalMaterial({
+        color:             col,
+        emissive:          col,
+        emissiveIntensity: isCyan ? 0.55 : 0.35,
+        metalness:         0.45,
+        roughness:         0.22,
+        clearcoat:         0.9,
+        clearcoatRoughness:0.15,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      // Stretch along Z (the lookAt forward axis) for continuity
+      mesh.scale.z = 1.35;
+      dragon.add(mesh);
+      segments.push({ mesh, r });
+
+      // Dorsal spines (skip head, neck, very tail)
+      if (i > 4 && i < NUM_SEGMENTS - 6 && i % 2 === 0) {
+        const sg = new THREE.ConeGeometry(0.10, r * 1.5, 8);
+        const sm = new THREE.MeshPhysicalMaterial({
+          color: COLOR_WHITE,
+          emissive: COLOR_WHITE,
+          emissiveIntensity: 0.7,
+          metalness: 0.3,
+          roughness: 0.25,
+        });
+        const fin = new THREE.Mesh(sg, sm);
+        fin.position.y = r * 0.85;
+        mesh.add(fin);
+      }
+    }
+
+    // ---------- Head decorations ----------
+    const head = segments[0].mesh;
+    const headR = segments[0].r;
+
+    // Eyes (glowing white)
+    const eyeGeo = new THREE.SphereGeometry(0.13, 16, 16);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: COLOR_WHITE });
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.42, 0.32, -0.55);
+    eyeR.position.set( 0.42, 0.32, -0.55);
+    head.add(eyeL); head.add(eyeR);
+
+    // Pupils
+    const pupGeo = new THREE.SphereGeometry(0.06, 12, 12);
+    const pupMat = new THREE.MeshBasicMaterial({ color: 0x041020 });
+    const pupL = new THREE.Mesh(pupGeo, pupMat);
+    const pupR = new THREE.Mesh(pupGeo, pupMat);
+    pupL.position.set(-0.42, 0.32, -0.66);
+    pupR.position.set( 0.42, 0.32, -0.66);
+    head.add(pupL); head.add(pupR);
+
+    // Horns: curved antlers built from a few cones
+    function makeHorn(side) {
+      const horn = new THREE.Group();
+      const segs = 4;
+      let prevTop = new THREE.Vector3(0, 0, 0);
+      for (let i = 0; i < segs; i++) {
+        const len = 0.55 - i * 0.08;
+        const rad = 0.10 - i * 0.018;
+        const cg = new THREE.ConeGeometry(rad, len, 10);
+        const cm = new THREE.MeshPhysicalMaterial({
+          color: COLOR_WHITE, emissive: COLOR_WHITE, emissiveIntensity: 0.5,
+          metalness: 0.3, roughness: 0.35
+        });
+        const c = new THREE.Mesh(cg, cm);
+        c.position.copy(prevTop);
+        c.position.y += len * 0.5;
+        c.position.x += side * (i * 0.08);
+        c.position.z -= i * 0.05;
+        c.rotation.z = side * (0.25 + i * 0.12);
+        horn.add(c);
+        prevTop = new THREE.Vector3(c.position.x + side * 0.08, c.position.y + len * 0.5, c.position.z);
+      }
+      return horn;
+    }
+    const hornL = makeHorn(-1); hornL.position.set(-0.25, headR * 0.55, 0.05); head.add(hornL);
+    const hornR = makeHorn( 1); hornR.position.set( 0.25, headR * 0.55, 0.05); head.add(hornR);
+
+    // Snout / nose nub
+    const snoutGeo = new THREE.SphereGeometry(0.55, 18, 14);
+    const snoutMat = new THREE.MeshPhysicalMaterial({
+      color: COLOR_CYAN, emissive: COLOR_CYAN, emissiveIntensity: 0.5,
+      metalness: 0.4, roughness: 0.25, clearcoat: 0.8
+    });
+    const snout = new THREE.Mesh(snoutGeo, snoutMat);
+    snout.scale.set(0.85, 0.7, 1.1);
+    snout.position.set(0, -0.05, -0.85);
+    head.add(snout);
+
+    // Mane: a tuft of small white spheres behind the horns
+    const maneGroup = new THREE.Group();
+    head.add(maneGroup);
+    for (let i = 0; i < 14; i++) {
+      const mg = new THREE.SphereGeometry(0.18 + Math.random() * 0.08, 10, 8);
+      const mm = new THREE.MeshPhysicalMaterial({
+        color: i % 2 ? COLOR_WHITE : COLOR_CYAN,
+        emissive: i % 2 ? COLOR_WHITE : COLOR_CYAN,
+        emissiveIntensity: 0.45,
+        roughness: 0.4, metalness: 0.2,
+      });
+      const m = new THREE.Mesh(mg, mm);
+      m.position.set(
+        (Math.random() - 0.5) * 0.7,
+        0.55 + Math.random() * 0.3,
+        0.3 + Math.random() * 0.5
+      );
+      maneGroup.add(m);
+    }
+
+    // ---------- Whiskers (rebuilt each frame for flowing motion) ----------
+    function makeWhiskerMesh() {
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: COLOR_WHITE,
+        emissive: COLOR_WHITE,
+        emissiveIntensity: 0.7,
+        metalness: 0.2,
+        roughness: 0.3,
+      });
+      const placeholder = new THREE.BufferGeometry();
+      const m = new THREE.Mesh(placeholder, mat);
+      head.add(m);
+      return m;
+    }
+    const whiskerL = makeWhiskerMesh();
+    const whiskerR = makeWhiskerMesh();
+
+    function rebuildWhisker(mesh, side, t) {
+      const pts = [];
+      const N = 24;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        // start near snout, sweep backwards along -Z
+        const z = -0.9 - u * 4.5;
+        const wave = Math.sin(t * 3 + u * 6 + side) * 0.55 * u;
+        const drop = -u * 0.6;
+        pts.push(new THREE.Vector3(side * (0.25 + u * 0.6 + wave * 0.3), drop + wave * 0.4, z));
+      }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const newGeo = new THREE.TubeGeometry(curve, 32, 0.04, 6, false);
+      mesh.geometry.dispose();
+      mesh.geometry = newGeo;
+    }
+
+    // ---------- Animation ----------
+    const targetPos = new THREE.Vector3();
+    const tmp       = new THREE.Vector3();
+    const clock     = new THREE.Clock();
+    let time = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 1 / 30);
+      time += dt;
+
+      // Head target: a complex 3D Lissajous so the dragon roams the scene
+      const A = 11, B = 6, C = 5;
+      targetPos.set(
+        Math.sin(time * 0.55) * A + Math.cos(time * 0.21) * 3,
+        Math.sin(time * 0.43) * B + Math.cos(time * 0.77) * 2,
+        Math.sin(time * 0.31) * C + Math.cos(time * 0.92) * 2
+      );
+
+      // Head chases target smoothly
+      spinePoints[0].lerp(targetPos, HEAD_FOLLOW);
+
+      // Each subsequent joint follows the previous, keeping max distance
+      for (let i = 1; i < spinePoints.length; i++) {
+        const prev = spinePoints[i - 1];
+        const curr = spinePoints[i];
+        tmp.subVectors(curr, prev);
+        const d = tmp.length();
+        if (d > SEGMENT_DIST || d < 1e-4) {
+          if (d < 1e-4) tmp.set(0, 0, SEGMENT_DIST);
+          else          tmp.multiplyScalar(SEGMENT_DIST / d);
+          curr.copy(prev).add(tmp);
+        }
+      }
+
+      // Place each mesh and orient toward the joint in front
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        seg.mesh.position.copy(spinePoints[i]);
+        const lookTarget = (i === 0) ? targetPos : spinePoints[i - 1];
+        seg.mesh.lookAt(lookTarget);
+      }
+
+      // Sync the head spotlight
+      headLight.position.copy(spinePoints[0]);
+
+      // Whiskers wave
+      rebuildWhisker(whiskerL, -1, time);
+      rebuildWhisker(whiskerR,  1, time);
+
+      // Subtle camera drift for cinematic feel
+      const cr = 4;
+      camera.position.x = Math.sin(time * 0.07) * cr;
+      camera.position.y = Math.cos(time * 0.05) * cr * 0.5;
+      camera.position.z = 32 + Math.sin(time * 0.09) * 3;
+      camera.lookAt(0, 0, 0);
+
+      composer.render();
+    }
+
+    // ---------- Postprocessing (bloom for glow) ----------
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.85,   // strength
+      0.55,   // radius
+      0.05    // threshold
+    );
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+
+    // ---------- Resize ----------
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      composer.setSize(w, h);
+      bloom.setSize(w, h);
+    });
+
+    animate();
+  </script>
+</body>
+</html>
