@@ -122,6 +122,223 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
+    // ---------- Click → dragon head apparition ----------
+    // Pool of ghost dragon heads. Each: dark head + horns lit by warm
+    // PointLights at the eye sockets, glowing eye spheres, additive halos.
+    // Fades in, holds, recedes and fades out.
+    const GHOST_COUNT = 5;
+    const ghostPool = [];
+
+    function buildGhost() {
+      const g = new THREE.Group();
+
+      // Head silhouette — dark, lit by the inner eye lights so it reads as
+      // a faintly suggested mass rather than an explicit object.
+      const headMat = new THREE.MeshStandardMaterial({
+        color: 0x05070a,
+        roughness: 0.85, metalness: 0.1,
+        transparent: true, opacity: 0,
+        depthWrite: false,
+      });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(1.2, 28, 20), headMat);
+      head.scale.set(1.15, 0.95, 1.45);
+      g.add(head);
+
+      // Snout
+      const snout = new THREE.Mesh(new THREE.SphereGeometry(0.65, 18, 14), headMat);
+      snout.scale.set(0.85, 0.7, 1.05);
+      snout.position.set(0, -0.1, -1.1);
+      g.add(snout);
+
+      // Brow ridges
+      for (const sx of [-1, 1]) {
+        const brow = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.12, 0.32), headMat);
+        brow.position.set(sx * 0.45, 0.55, -0.55);
+        brow.rotation.z = sx * -0.25;
+        g.add(brow);
+      }
+
+      // Horns (small, suggested)
+      const hornMat = new THREE.MeshStandardMaterial({
+        color: 0x06060a, roughness: 0.6, metalness: 0.3,
+        transparent: true, opacity: 0,
+        depthWrite: false,
+      });
+      for (const sx of [-1, 1]) {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.85, 8), hornMat);
+        horn.position.set(sx * 0.45, 1.0, 0.0);
+        horn.rotation.z = sx * -0.32;
+        horn.rotation.x = -0.3;
+        g.add(horn);
+      }
+
+      // Whisker hint — short curved tubes flowing back
+      const whiskerMat = new THREE.MeshStandardMaterial({
+        color: 0x0a0608, roughness: 0.7,
+        transparent: true, opacity: 0,
+        depthWrite: false,
+      });
+      for (const sx of [-1, 1]) {
+        const pts = [];
+        for (let i = 0; i <= 12; i++) {
+          const u = i / 12;
+          pts.push(new THREE.Vector3(
+            sx * (0.35 + u * 0.6),
+            -0.3 - u * 0.6,
+            -1.1 - u * 1.5,
+          ));
+        }
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.04, 5, false), whiskerMat);
+        g.add(tube);
+      }
+
+      // Glowing eyes (golden)
+      const eyeMat = new THREE.MeshBasicMaterial({
+        color: 0xffd870, transparent: true, opacity: 0, depthWrite: false,
+      });
+      const eyes = [];
+      for (const sx of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 12), eyeMat.clone());
+        eye.position.set(sx * 0.46, 0.32, -0.78);
+        g.add(eye);
+        eyes.push(eye);
+      }
+
+      // Slit pupils (visible only when bright)
+      const pupMat = new THREE.MeshBasicMaterial({
+        color: 0x100804, transparent: true, opacity: 0, depthWrite: false,
+      });
+      const pups = [];
+      for (const sx of [-1, 1]) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 0.04), pupMat.clone());
+        p.position.set(sx * 0.46, 0.32, -0.92);
+        g.add(p);
+        pups.push(p);
+      }
+
+      // Additive warm halos behind eyes
+      function makeHalo() {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 128;
+        const cx = cv.getContext('2d');
+        const grd = cx.createRadialGradient(64, 64, 4, 64, 64, 60);
+        grd.addColorStop(0.0,  'rgba(255, 200, 120, 1)');
+        grd.addColorStop(0.35, 'rgba(255, 130,  60, 0.5)');
+        grd.addColorStop(1.0,  'rgba(255, 100,  40, 0)');
+        cx.fillStyle = grd;
+        cx.fillRect(0, 0, 128, 128);
+        return new THREE.CanvasTexture(cv);
+      }
+      const haloTex = makeHalo();
+      const halos = [];
+      for (const sx of [-1, 1]) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: haloTex,
+          color: 0xffb070,
+          transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }));
+        sprite.scale.set(2.4, 2.4, 1);
+        sprite.position.set(sx * 0.46, 0.32, -0.85);
+        g.add(sprite);
+        halos.push(sprite);
+      }
+
+      // Warm point light at the eyes — illuminates head, falls off fast
+      const eyeLight = new THREE.PointLight(0xff9a4a, 0, 6, 1.8);
+      eyeLight.position.set(0, 0.25, -0.6);
+      g.add(eyeLight);
+
+      g.userData = {
+        active: false, t: 0, duration: 2.4,
+        peakLight: 3.5,
+        recede: new THREE.Vector3(),
+        materials: [headMat, hornMat, whiskerMat],
+        eyes, pups, halos, eyeLight,
+      };
+      g.visible = false;
+      return g;
+    }
+
+    for (let i = 0; i < GHOST_COUNT; i++) {
+      const g = buildGhost();
+      scene.add(g);
+      ghostPool.push(g);
+    }
+
+    function spawnGhostAt(worldPos) {
+      // Pick first inactive, otherwise oldest (smallest remaining time)
+      let g = ghostPool.find(g => !g.userData.active);
+      if (!g) {
+        g = ghostPool.reduce((a, b) => a.userData.t > b.userData.t ? a : b);
+      }
+      g.position.copy(worldPos);
+      g.rotation.set(
+        (Math.random() - 0.5) * 0.25,
+        (Math.random() - 0.5) * 0.55,
+        (Math.random() - 0.5) * 0.18,
+      );
+      const s = 0.55 + Math.random() * 0.35;
+      g.scale.setScalar(s);
+      // Recede direction: backward in Z + slight up/random lateral drift
+      g.userData.recede.set(
+        (Math.random() - 0.5) * 0.4,
+        0.4 + Math.random() * 0.4,
+        -1.2 - Math.random() * 0.8,
+      );
+      g.userData.t = 0;
+      g.userData.active = true;
+      g.visible = true;
+    }
+
+    function updateGhosts(dt) {
+      for (const g of ghostPool) {
+        if (!g.userData.active) continue;
+        const u = g.userData;
+        u.t += dt;
+        const k = u.t / u.duration;
+        if (k >= 1) { u.active = false; g.visible = false; u.eyeLight.intensity = 0; continue; }
+
+        // Alpha curve: quick fade-in, brief hold, slower fade-out
+        let a;
+        if      (k < 0.18) a = k / 0.18;
+        else if (k < 0.55) a = 1.0;
+        else               a = 1.0 - (k - 0.55) / 0.45;
+        a = Math.max(0, Math.min(1, a));
+
+        // Apply per-part opacities
+        for (const m of u.materials) m.opacity = a * 0.78;
+        for (const eye of u.eyes)    eye.material.opacity = a;
+        for (const pup of u.pups)    pup.material.opacity = a;
+        for (const h of u.halos)     h.material.opacity   = a * 0.85;
+        u.eyeLight.intensity = a * u.peakLight;
+
+        // Subtle drift away — eyes recede backward as they fade
+        g.position.addScaledVector(u.recede, dt * 0.45);
+        // Gentle scale-up while fading out for ethereal feel
+        const sBase = g.scale.x;
+        const sNew = sBase * (1 + dt * 0.04 * (k > 0.55 ? 1 : 0.2));
+        g.scale.setScalar(sNew);
+      }
+    }
+
+    // Project click to a world plane in front of the camera (z = 2)
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const clickPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -2);
+    const hit = new THREE.Vector3();
+
+    addEventListener('pointerdown', (e) => {
+      ndc.x = (e.clientX / innerWidth)  * 2 - 1;
+      ndc.y = -((e.clientY / innerHeight) * 2 - 1);
+      raycaster.setFromCamera(ndc, camera);
+      if (raycaster.ray.intersectPlane(clickPlane, hit)) {
+        spawnGhostAt(hit);
+      }
+    });
+
     // ---------- Loop ----------
     const clock = new THREE.Clock();
     let time = 0;
@@ -169,6 +386,8 @@
       camera.position.x = mouse.x * 0.6;
       camera.position.y = mouse.y * 0.4;
       camera.lookAt(0, 0, 0);
+
+      updateGhosts(dt);
 
       renderer.render(scene, camera);
     }
