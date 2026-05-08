@@ -15,30 +15,18 @@
       cursor: none;
     }
     canvas { display: block; }
-
     #title {
-      position: fixed;
-      left: 50%; bottom: 26px;
-      transform: translateX(-50%);
-      letter-spacing: 0.5em;
-      font-size: 11px;
-      text-transform: uppercase;
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+      letter-spacing: 0.5em; font-size: 11px; text-transform: uppercase;
       color: rgba(216, 200, 168, 0.55);
       text-shadow: 0 0 12px rgba(255, 120, 60, 0.25);
-      pointer-events: none;
-      user-select: none;
-      z-index: 5;
+      pointer-events: none; user-select: none; z-index: 5;
     }
-
     #cursor {
-      position: fixed;
-      width: 14px; height: 14px;
-      border: 1px solid rgba(255, 200, 160, 0.7);
-      border-radius: 50%;
+      position: fixed; width: 14px; height: 14px;
+      border: 1px solid rgba(255, 200, 160, 0.7); border-radius: 50%;
       transform: translate(-50%, -50%);
-      pointer-events: none;
-      mix-blend-mode: screen;
-      z-index: 9;
+      pointer-events: none; mix-blend-mode: screen; z-index: 9;
       transition: transform 0.08s ease-out;
     }
     #cursor::before {
@@ -69,29 +57,30 @@
     import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
 
     // ============================================================
-    //  Palette (sumi-e / irezumi reference)
+    //  Palette
     // ============================================================
     const COL = {
-      INK_DEEP:    0x06121a,
-      TEAL_DARK:   0x0e2a2c,
-      TEAL_MID:    0x1a4344,
-      TEAL_LIGHT:  0x355e5c,
-      MOON:        0xfff0c8,
-      DRAGON_BODY: 0x16110d,
-      DRAGON_BELLY:0x9c8662,
-      RIM_FIRE:    0xff5e2c,
-      MANE_HOT:    0xff8a3a,
-      MANE_GOLD:   0xffc674,
-      PETAL_LIGHT: 0xffc7d8,
-      PETAL_DEEP:  0xff8aaa,
-      EYE_GLOW:    0xffe89a,
+      DRAGON_DARK:  0x12100d,
+      DRAGON_BODY:  0x1c1812,
+      SCALE_RIM:    0xff5e2c,
+      BELLY:        0xb59065,
+      BELLY_DARK:   0x6c4f2e,
+      MANE_HOT:     0xff8a3a,
+      MANE_GOLD:    0xffc674,
+      MANE_DEEP:    0xff3a18,
+      EYE_GLOW:     0xfff0a0,
+      TOOTH:        0xfff5e0,
+      TONGUE:       0xa31a2a,
+      CLAW:         0xf5e8d0,
+      PETAL_LIGHT:  0xffc7d8,
+      PETAL_DEEP:   0xff8aaa,
     };
 
     // ============================================================
-    //  Scene / Renderer / Camera
+    //  Renderer / Scene / Camera
     // ============================================================
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0a1c1e, 0.012);
+    scene.fog = new THREE.FogExp2(0x0a1c1e, 0.011);
 
     const camera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 400);
     camera.position.set(0, 2, 38);
@@ -105,7 +94,7 @@
     document.body.appendChild(renderer.domElement);
 
     // ============================================================
-    //  Background — gradient sky + soft moon + god rays (full-screen shader)
+    //  Background — gradient sky + soft moon + god rays + ink mist
     // ============================================================
     const bgUniforms = {
       uTime:       { value: 0 },
@@ -124,8 +113,6 @@
         varying vec2 vUv;
         uniform float uTime;
         uniform vec2  uMouse;
-
-        // Hash + value noise
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float vnoise(vec2 p){
           vec2 i = floor(p), f = fract(p);
@@ -134,28 +121,24 @@
           vec2 u = f*f*(3.0-2.0*f);
           return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
         }
-        float fbm(vec2 p){
-          float v = 0.0, a = 0.5;
-          for(int i=0; i<5; i++){ v += a*vnoise(p); p *= 2.03; a *= 0.5; }
-          return v;
-        }
+        float fbm(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<5;i++){v+=a*vnoise(p);p*=2.03;a*=0.5;} return v; }
 
         void main() {
-          vec2 uv = vUv;
+          vec2 uv  = vUv;
           vec2 puv = uv + uMouse * 0.02;
 
-          // Vertical gradient: ink -> teal -> deeper
+          // Vertical ink → teal → ink gradient
           vec3 colDeep = vec3(0.020, 0.060, 0.075);
           vec3 colMid  = vec3(0.060, 0.180, 0.190);
           vec3 colTop  = vec3(0.030, 0.080, 0.110);
           vec3 col = mix(colDeep, colMid, smoothstep(0.0, 0.55, uv.y));
           col = mix(col, colTop, smoothstep(0.55, 1.0, uv.y));
 
-          // Soft moon (top right)
+          // Soft moon top-right
           vec2 moonPos = vec2(0.80 - uMouse.x * 0.02, 0.74 - uMouse.y * 0.02);
           float r = length((puv - moonPos) * vec2(1.0, 1.05));
-          float disc  = smoothstep(0.075, 0.062, r);
-          float halo  = exp(-r * 6.0) * 0.35;
+          float disc = smoothstep(0.075, 0.062, r);
+          float halo = exp(-r * 6.0) * 0.35;
           float bigGl = exp(-r * 2.0) * 0.10;
           col += vec3(1.00, 0.94, 0.78) * (disc * 0.9 + halo + bigGl);
 
@@ -165,7 +148,7 @@
           float ang = atan(d.y, d.x);
           float rays = 0.5 + 0.5 * sin(ang * 14.0 + uTime * 0.05);
           rays *= smoothstep(0.0, 1.0, 1.0 - length(d));
-          rays *= smoothstep(-0.3, -1.4, d.y); // fade away from light source
+          rays *= smoothstep(-0.3, -1.4, d.y);
           col += vec3(1.0, 0.92, 0.72) * rays * 0.10;
 
           // Atmospheric ink mist (slow FBM drift)
@@ -173,7 +156,7 @@
           mist = smoothstep(0.35, 0.85, mist);
           col = mix(col, vec3(0.02, 0.07, 0.08), mist * 0.55);
 
-          // Subtle vignette
+          // Vignette
           float v = smoothstep(1.2, 0.35, length(uv - 0.5));
           col *= 0.55 + 0.45 * v;
 
@@ -216,66 +199,191 @@
     const mountainsNear = makeMountainLayer({ z:  -45, color: 0x06141a, peaks: 12, height: 12 });
     scene.add(mountainsFar, mountainsMid, mountainsNear);
 
-    // Ink mist puffs floating around
+    // Floating ink puffs
     const mistGroup = new THREE.Group();
     {
       const mistMat = new THREE.MeshBasicMaterial({
         color: 0x07181a, transparent: true, opacity: 0.55, fog: true, depthWrite: false,
       });
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 18; i++) {
         const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), mistMat);
-        m.position.set(
-          (Math.random() - 0.5) * 140,
-          -2 + Math.random() * 18,
-          -25 - Math.random() * 60
-        );
-        const s = 6 + Math.random() * 14;
-        m.scale.set(s * 1.6, s * 0.8, s);
-        m.userData = { driftPhase: Math.random() * Math.PI * 2, baseX: m.position.x };
+        m.position.set((Math.random()-0.5)*140, -2 + Math.random()*18, -25 - Math.random()*60);
+        const s = 6 + Math.random()*14;
+        m.scale.set(s*1.6, s*0.8, s);
+        m.userData = { driftPhase: Math.random()*Math.PI*2, baseX: m.position.x };
         mistGroup.add(m);
       }
     }
     scene.add(mistGroup);
 
     // ============================================================
+    //  Seigaiha (Japanese wave) ground — procedural canvas texture
+    // ============================================================
+    {
+      const sz = 1024;
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = sz;
+      const cx = cv.getContext('2d');
+      const grad = cx.createLinearGradient(0, 0, 0, sz);
+      grad.addColorStop(0, '#08191c');
+      grad.addColorStop(1, '#02080a');
+      cx.fillStyle = grad;
+      cx.fillRect(0, 0, sz, sz);
+
+      const radius   = sz / 14;
+      const stepX    = radius * 1.5;
+      const stepY    = radius * 0.55;
+      cx.lineCap = 'round';
+      const cols = ['#5b8c92', '#3e6a72', '#22484f', '#143036'];
+      for (let row = -1; row * stepY < sz + radius; row++) {
+        const yC = row * stepY;
+        const off = (row % 2) ? stepX * 0.5 : 0;
+        for (let col = -1; col * stepX < sz + radius; col++) {
+          const xC = col * stepX + off;
+          for (let k = 0; k < 4; k++) {
+            cx.beginPath();
+            cx.strokeStyle = cols[k];
+            cx.lineWidth   = 1.4 - k * 0.15;
+            cx.arc(xC, yC, radius - k * (radius/5), Math.PI, 0, false);
+            cx.stroke();
+          }
+        }
+      }
+      const tex = new THREE.CanvasTexture(cv);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 4);
+      tex.colorSpace = THREE.SRGBColorSpace;
+
+      const seaGeo = new THREE.PlaneGeometry(380, 380, 1, 1);
+      const seaMat = new THREE.MeshStandardMaterial({
+        map: tex, color: 0xffffff,
+        emissive: 0x14383c, emissiveIntensity: 0.45,
+        roughness: 0.9, metalness: 0.0, fog: true,
+      });
+      const sea = new THREE.Mesh(seaGeo, seaMat);
+      sea.rotation.x = -Math.PI / 2;
+      sea.position.set(0, -14, -20);
+      scene.add(sea);
+    }
+
+    // ============================================================
     //  Lights
     // ============================================================
     scene.add(new THREE.AmbientLight(0x2a3d40, 0.55));
-    const moonLight = new THREE.DirectionalLight(0xffe6c2, 0.65);
+    const moonLight = new THREE.DirectionalLight(0xffe6c2, 0.7);
     moonLight.position.set(20, 18, 6);
     scene.add(moonLight);
-    const rimDir = new THREE.DirectionalLight(0xff7a3a, 0.55);
+    const rimDir = new THREE.DirectionalLight(0xff7a3a, 0.6);
     rimDir.position.set(-12, -6, 8);
     scene.add(rimDir);
-
-    // Fire glow sticking near the dragon's mane
-    const maneLight = new THREE.PointLight(0xff7a3a, 2.6, 22, 1.6);
+    const maneLight = new THREE.PointLight(0xff7a3a, 3.0, 28, 1.6);
     scene.add(maneLight);
 
     // ============================================================
-    //  Dragon material — rim-lit ink with warm fire edge
+    //  Dragon — rim-lit ink material with procedural scale pattern
     // ============================================================
-    function makeInkMaterial({ color = COL.DRAGON_BODY, rimColor = COL.RIM_FIRE, rimStrength = 1.3, rimPower = 2.4, emissive = 0x000000, emissiveIntensity = 0 } = {}) {
+    function makeScaleMaterial(opts = {}) {
+      const o = Object.assign({
+        color:        COL.DRAGON_BODY,
+        bellyColor:   null,           // if set, use elliptical belly mask
+        rimColor:     COL.SCALE_RIM,
+        rimStrength:  1.5,
+        rimPower:     2.2,
+        scaleFreq:    new THREE.Vector2(11.0, 5.5),
+        scaleEdge:    1.4,            // how fiery the scale edges glow
+        scaleDepth:   0.35,           // contrast between scale interior and edge
+        emissive:     0x000000,
+        emissiveIntensity: 0,
+        roughness:    0.55,
+        metalness:    0.30,
+      }, opts);
+
       const mat = new THREE.MeshStandardMaterial({
-        color,
-        roughness: 0.55,
-        metalness: 0.35,
-        emissive,
-        emissiveIntensity,
+        color:    o.color,
+        emissive: o.emissive,
+        emissiveIntensity: o.emissiveIntensity,
+        roughness: o.roughness,
+        metalness: o.metalness,
       });
-      mat.userData.rimColor = new THREE.Color(rimColor);
-      mat.userData.rimPower = rimPower;
-      mat.userData.rimStrength = rimStrength;
       mat.onBeforeCompile = (shader) => {
-        shader.uniforms.rimColor    = { value: mat.userData.rimColor };
-        shader.uniforms.rimPower    = { value: mat.userData.rimPower };
-        shader.uniforms.rimStrength = { value: mat.userData.rimStrength };
+        shader.uniforms.rimColor    = { value: new THREE.Color(o.rimColor) };
+        shader.uniforms.rimStrength = { value: o.rimStrength };
+        shader.uniforms.rimPower    = { value: o.rimPower };
+        shader.uniforms.scaleFreq   = { value: o.scaleFreq };
+        shader.uniforms.scaleEdge   = { value: o.scaleEdge };
+        shader.uniforms.scaleDepth  = { value: o.scaleDepth };
+        shader.uniforms.bellyColor  = { value: new THREE.Color(o.bellyColor || o.color) };
+        shader.uniforms.useBelly    = { value: o.bellyColor ? 1 : 0 };
+
+        // ---- vertex: pass local pos & object-space normal
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <common>',
+          `#include <common>
+           varying vec3 vLocalPos;
+           varying vec3 vLocalNormal;`
+        ).replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+           vLocalPos    = position;
+           vLocalNormal = normal;`
+        );
+
+        // ---- fragment: compute scale pattern + apply belly + rim
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <common>',
           `#include <common>
+           varying vec3 vLocalPos;
+           varying vec3 vLocalNormal;
            uniform vec3  rimColor;
            uniform float rimPower;
-           uniform float rimStrength;`
+           uniform float rimStrength;
+           uniform vec2  scaleFreq;
+           uniform float scaleEdge;
+           uniform float scaleDepth;
+           uniform vec3  bellyColor;
+           uniform int   useBelly;
+
+           float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          `
+        ).replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+           // Spherical projection of local position to UV-like coords
+           vec3  ln = normalize(vLocalPos);
+           float lon = atan(ln.z, ln.x);
+           float lat = asin(clamp(ln.y, -1.0, 1.0));
+           vec2  sUV = vec2(lon, lat * 1.6) * scaleFreq;
+           sUV.x += step(0.5, fract(sUV.y * 0.5)) * 0.5;          // brick stagger
+           vec2  cellId = floor(sUV);
+           vec2  cellUV = fract(sUV) - 0.5;
+
+           // Elliptical scale (slightly elongated along v)
+           float dCell = length(cellUV * vec2(1.05, 0.78));
+           // Edge mask: bright fiery rim around each scale
+           float edge   = smoothstep(0.36, 0.43, dCell) * (1.0 - smoothstep(0.43, 0.50, dCell));
+           // Soft inner shading: each scale is a tiny dome
+           float inner  = 1.0 - smoothstep(0.0, 0.40, dCell);
+           // Per-scale variation
+           float cellH  = h21(cellId);
+           // Modify diffuseColor before lighting
+           vec3 baseCol = diffuseColor.rgb * (0.55 + 0.45 * inner);          // dome shading
+           baseCol *= (0.85 + 0.30 * cellH * scaleDepth);                    // per-scale tint
+           // Fire-rim line between scales
+           vec3 fire = rimColor * scaleEdge;
+           baseCol = mix(baseCol, fire, edge);
+
+           // Belly mask: elliptical underside zone (only when enabled)
+           if (useBelly == 1) {
+             float belly = smoothstep(-0.15, -0.65, ln.y);
+             // Belly band breaks horizontally to suggest plates
+             float plate = abs(sin(lon * 16.0 + lat * 4.0));
+             plate = smoothstep(0.55, 0.95, plate);
+             vec3 bcol = bellyColor * (0.7 + 0.3 * plate);
+             baseCol = mix(baseCol, bcol, belly);
+           }
+
+           diffuseColor.rgb = baseCol;
+          `
         ).replace(
           'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
           `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
@@ -283,31 +391,69 @@
              vec3 _vDir = normalize(vViewPosition);
              float _rim = pow(1.0 - clamp(dot(normalize(normal), _vDir), 0.0, 1.0), rimPower);
              outgoingLight += rimColor * _rim * rimStrength;
-           }`
+           }
+          `
         );
       };
       return mat;
     }
 
     // ============================================================
-    //  Dragon — parametric S-curve spine, animated, head tracks mouse
+    //  Dragon assembly
     // ============================================================
     const SPINE_N = 80;
     const dragonGroup = new THREE.Group();
     scene.add(dragonGroup);
 
-    const bodyMat   = makeInkMaterial({ color: COL.DRAGON_BODY, rimColor: COL.RIM_FIRE, rimStrength: 1.4, rimPower: 2.2 });
-    const bellyMat  = makeInkMaterial({ color: COL.DRAGON_BELLY, rimColor: COL.MANE_GOLD, rimStrength: 0.6, rimPower: 3.0 });
-    const finMat    = makeInkMaterial({ color: 0x2a1610, rimColor: COL.RIM_FIRE, rimStrength: 1.8, rimPower: 1.6, emissive: 0x381205, emissiveIntensity: 0.3 });
-    const hornMat   = makeInkMaterial({ color: 0x2a201a, rimColor: 0xffd6a0, rimStrength: 1.0, rimPower: 2.8 });
+    const bodyMat   = makeScaleMaterial({
+      color: COL.DRAGON_BODY, bellyColor: COL.BELLY,
+      rimColor: COL.SCALE_RIM, rimStrength: 1.7, rimPower: 2.0,
+      scaleFreq: new THREE.Vector2(13.0, 6.0), scaleEdge: 1.6, scaleDepth: 0.4,
+    });
+    const finMat = makeScaleMaterial({
+      color: 0x2a1610, rimColor: COL.MANE_DEEP, rimStrength: 2.4, rimPower: 1.4,
+      emissive: 0x381205, emissiveIntensity: 0.5,
+      scaleFreq: new THREE.Vector2(8, 4),
+    });
+    const hornMat = makeScaleMaterial({
+      color: 0x2a201a, rimColor: 0xffd6a0, rimStrength: 1.0, rimPower: 2.8,
+      scaleFreq: new THREE.Vector2(20, 8), scaleEdge: 0.4, scaleDepth: 0.2,
+    });
+    const limbMat = makeScaleMaterial({
+      color: COL.DRAGON_BODY, bellyColor: COL.BELLY_DARK,
+      rimColor: COL.SCALE_RIM, rimStrength: 1.4, rimPower: 2.0,
+      scaleFreq: new THREE.Vector2(9, 9), scaleEdge: 1.3,
+    });
+    const clawMat = new THREE.MeshStandardMaterial({
+      color: COL.CLAW, emissive: 0x886040, emissiveIntensity: 0.25,
+      metalness: 0.4, roughness: 0.35,
+    });
+    const toothMat = new THREE.MeshStandardMaterial({
+      color: COL.TOOTH, emissive: 0x554020, emissiveIntensity: 0.2,
+      metalness: 0.2, roughness: 0.4,
+    });
+    const tongueMat = new THREE.MeshStandardMaterial({
+      color: COL.TONGUE, emissive: 0x501018, emissiveIntensity: 0.6,
+      roughness: 0.6, metalness: 0.0,
+    });
+    const flameCoreMat = new THREE.MeshStandardMaterial({
+      color: COL.MANE_GOLD, emissive: COL.MANE_HOT, emissiveIntensity: 1.6,
+      transparent: true, opacity: 0.95,
+      depthWrite: false,
+    });
+    const flameTipMat = new THREE.MeshStandardMaterial({
+      color: COL.MANE_DEEP, emissive: COL.MANE_DEEP, emissiveIntensity: 1.4,
+      transparent: true, opacity: 0.85,
+      depthWrite: false,
+    });
 
     function radiusFor(i) {
-      if (i === 0) return 1.05;
-      if (i < 5)   return 0.95 - i * 0.04;
-      if (i < 14)  return 0.85;
+      if (i === 0) return 1.10;
+      if (i < 5)   return 1.0 - i * 0.05;
+      if (i < 14)  return 0.92;
       const t = (i - 14) / (SPINE_N - 14);
       const bulge = Math.sin(t * Math.PI) * 0.18;
-      return Math.max(0.06, 0.85 + bulge - t * 0.78);
+      return Math.max(0.06, 0.92 + bulge - t * 0.85);
     }
 
     const segments = [];
@@ -317,115 +463,200 @@
       const r = radiusFor(i);
       const seg = new THREE.Group();
 
-      // Body sphere (dark, rim-lit)
-      const body = new THREE.Mesh(new THREE.SphereGeometry(r, 22, 14), bodyMat);
+      // Body sphere
+      const body = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), bodyMat);
       body.scale.z = 1.32;
       seg.add(body);
-
-      // Belly stripe (thin underside band)
-      if (i > 1 && i < SPINE_N - 6) {
-        const belly = new THREE.Mesh(new THREE.SphereGeometry(r * 0.82, 16, 10, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.35), bellyMat);
-        belly.scale.set(0.78, 1.0, 1.32);
-        belly.position.y = -r * 0.08;
-        seg.add(belly);
-      }
-
-      // Dorsal fin: jagged red-orange spines
-      if (i > 3 && i < SPINE_N - 8 && i % 2 === 0) {
-        const fin = new THREE.Mesh(new THREE.ConeGeometry(0.13, r * 1.6, 6), finMat);
-        fin.position.y = r * 0.85;
-        fin.rotation.x = -0.05;
-        seg.add(fin);
-      }
 
       dragonGroup.add(seg);
       segments.push({ group: seg, body, r });
     }
 
-    // ---- Head ornaments ----
-    const headSeg  = segments[0];
-    const headMesh = headSeg.group;
-    const headR    = headSeg.r;
-    {
-      // Eyes (glowing yellow)
-      const eyeMat = new THREE.MeshBasicMaterial({ color: COL.EYE_GLOW });
-      const eyeGeo = new THREE.SphereGeometry(0.13, 12, 12);
-      const eL = new THREE.Mesh(eyeGeo, eyeMat); eL.position.set(-0.45, 0.36, -0.55);
-      const eR = new THREE.Mesh(eyeGeo, eyeMat); eR.position.set( 0.45, 0.36, -0.55);
-      headMesh.add(eL); headMesh.add(eR);
-
-      const pupMat = new THREE.MeshBasicMaterial({ color: 0x100804 });
-      const pupGeo = new THREE.SphereGeometry(0.06, 10, 10);
-      const pL = new THREE.Mesh(pupGeo, pupMat); pL.position.set(-0.45, 0.36, -0.66);
-      const pR = new THREE.Mesh(pupGeo, pupMat); pR.position.set( 0.45, 0.36, -0.66);
-      headMesh.add(pL); headMesh.add(pR);
-
-      // Snout
-      const snout = new THREE.Mesh(
-        new THREE.SphereGeometry(0.6, 16, 12),
-        bodyMat
+    // ============================================================
+    //  Dorsal mane — flames running along the spine (head + back)
+    // ============================================================
+    function buildFlame(scale) {
+      const g = new THREE.Group();
+      const core = new THREE.Mesh(
+        new THREE.ConeGeometry(0.18 * scale, 1.4 * scale, 8),
+        flameCoreMat
       );
-      snout.scale.set(0.95, 0.78, 1.18);
-      snout.position.set(0, -0.05, -0.95);
-      headMesh.add(snout);
+      core.position.y = 0.7 * scale;
+      g.add(core);
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.10 * scale, 0.9 * scale, 6),
+        flameTipMat
+      );
+      tip.position.y = 1.15 * scale;
+      tip.rotation.z = 0.15;
+      g.add(tip);
+      g.userData = {
+        baseScale: scale,
+        phase: Math.random() * Math.PI * 2,
+        sway:  0.3 + Math.random() * 0.4,
+      };
+      return g;
+    }
 
-      // Lower jaw — small open mouth hint
-      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.18, 0.55), bodyMat);
-      jaw.position.set(0, -0.35, -0.85);
-      headMesh.add(jaw);
+    // Heavy mane behind the head & along the upper neck
+    const headMane = new THREE.Group();
+    segments[0].group.add(headMane);
+    for (let i = 0; i < 22; i++) {
+      const f = buildFlame(0.7 + Math.random() * 0.7);
+      f.position.set(
+        (Math.random() - 0.5) * 0.9,
+        0.45 + Math.random() * 0.55,
+        0.4 + Math.random() * 1.1
+      );
+      f.rotation.z = (Math.random() - 0.5) * 0.5;
+      f.rotation.x = (Math.random() - 0.5) * 0.5;
+      headMane.add(f);
+    }
 
-      // Fangs
-      const fangMat = new THREE.MeshStandardMaterial({ color: 0xfff5e0, roughness: 0.4, metalness: 0.2, emissive: 0x6a4020, emissiveIntensity: 0.15 });
-      for (const sx of [-0.18, 0.18]) {
-        const fang = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), fangMat);
-        fang.position.set(sx, -0.18, -1.05);
-        fang.rotation.x = Math.PI;
-        headMesh.add(fang);
-      }
-
-      // Branching antler-like horns
-      function buildHorn(side) {
-        const horn = new THREE.Group();
-        let prev = new THREE.Vector3();
-        for (let i = 0; i < 5; i++) {
-          const len = 0.65 - i * 0.09;
-          const rad = 0.12 - i * 0.02;
-          const c = new THREE.Mesh(new THREE.ConeGeometry(rad, len, 8), hornMat);
-          c.position.copy(prev);
-          c.position.y += len * 0.5;
-          c.position.x += side * (i * 0.10);
-          c.position.z -= i * 0.07;
-          c.rotation.z = side * (0.22 + i * 0.10);
-          c.rotation.x = -i * 0.06;
-          horn.add(c);
-          prev = new THREE.Vector3(c.position.x + side * 0.1, c.position.y + len * 0.5, c.position.z - 0.05);
-        }
-        return horn;
-      }
-      const hL = buildHorn(-1); hL.position.set(-0.32, headR * 0.55, 0.10); headMesh.add(hL);
-      const hR = buildHorn( 1); hR.position.set( 0.32, headR * 0.55, 0.10); headMesh.add(hR);
-
-      // Mane: cluster of warm emissive spheres along nape
-      const maneColors = [COL.MANE_HOT, COL.MANE_GOLD, COL.RIM_FIRE, 0xffd07a, 0xff5a25];
-      for (let i = 0; i < 26; i++) {
-        const c = maneColors[i % maneColors.length];
-        const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.16 + Math.random() * 0.12, 10, 8),
-          new THREE.MeshStandardMaterial({
-            color: c, emissive: c, emissiveIntensity: 1.4,
-            roughness: 0.35, metalness: 0.1,
-          })
+    // Dorsal flames along segments 4..40
+    for (let i = 4; i < 42; i++) {
+      const seg = segments[i];
+      const count = 2 + ((i % 3 === 0) ? 1 : 0);
+      for (let k = 0; k < count; k++) {
+        const f = buildFlame(0.35 + Math.random() * 0.4);
+        f.position.set(
+          (Math.random() - 0.5) * 0.4,
+          seg.r * 0.85 + (Math.random() - 0.5) * 0.1,
+          (k - count/2) * 0.25
         );
-        m.position.set(
-          (Math.random() - 0.5) * 0.85,
-          0.35 + Math.random() * 0.55,
-          0.45 + Math.random() * 0.85
-        );
-        headMesh.add(m);
+        f.rotation.z = (Math.random() - 0.5) * 0.4;
+        seg.group.add(f);
       }
     }
 
-    // Whiskers (long flowing)
+    // Elbow / shoulder flame tufts (placed on legs later via spine offsets)
+    const elbowFlames = [];
+    function buildElbowTuft() {
+      const tuft = new THREE.Group();
+      for (let i = 0; i < 6; i++) {
+        const f = buildFlame(0.35 + Math.random() * 0.3);
+        f.position.set((Math.random()-0.5)*0.35, Math.random()*0.2, (Math.random()-0.5)*0.35);
+        f.rotation.z = (Math.random()-0.5)*0.4;
+        tuft.add(f);
+      }
+      scene.add(tuft);
+      elbowFlames.push(tuft);
+      return tuft;
+    }
+
+    // ============================================================
+    //  Head ornaments
+    // ============================================================
+    const headSeg  = segments[0];
+    const headMesh = headSeg.group;
+    const headR    = headSeg.r;
+
+    // Snout
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.65, 18, 14), bodyMat);
+    snout.scale.set(1.0, 0.78, 1.25);
+    snout.position.set(0, -0.05, -1.0);
+    headMesh.add(snout);
+
+    // Eyes (glowing yellow with dark socket)
+    const socketMat = new THREE.MeshStandardMaterial({ color: 0x06030a, roughness: 0.8 });
+    const socketGeo = new THREE.SphereGeometry(0.22, 14, 12);
+    const sockL = new THREE.Mesh(socketGeo, socketMat); sockL.position.set(-0.46, 0.36, -0.50);
+    const sockR = new THREE.Mesh(socketGeo, socketMat); sockR.position.set( 0.46, 0.36, -0.50);
+    sockL.scale.set(1, 0.7, 0.9); sockR.scale.set(1, 0.7, 0.9);
+    headMesh.add(sockL); headMesh.add(sockR);
+
+    const eyeGlowMat = new THREE.MeshBasicMaterial({ color: COL.EYE_GLOW });
+    const eyeGeo = new THREE.SphereGeometry(0.13, 14, 12);
+    const eL = new THREE.Mesh(eyeGeo, eyeGlowMat); eL.position.set(-0.46, 0.36, -0.62);
+    const eR = new THREE.Mesh(eyeGeo, eyeGlowMat); eR.position.set( 0.46, 0.36, -0.62);
+    headMesh.add(eL); headMesh.add(eR);
+
+    // Eye slit pupils
+    const pupMat = new THREE.MeshBasicMaterial({ color: 0x100804 });
+    const pupGeo = new THREE.BoxGeometry(0.03, 0.16, 0.04);
+    const pL = new THREE.Mesh(pupGeo, pupMat); pL.position.set(-0.46, 0.36, -0.74);
+    const pR = new THREE.Mesh(pupGeo, pupMat); pR.position.set( 0.46, 0.36, -0.74);
+    headMesh.add(pL); headMesh.add(pR);
+
+    // Brow ridges (angry)
+    const browMat = new THREE.MeshStandardMaterial({ color: COL.DRAGON_DARK, roughness: 0.5, metalness: 0.3 });
+    function makeBrow(side) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.13, 0.35), browMat);
+      b.position.set(side * 0.46, 0.6, -0.55);
+      b.rotation.z = side * -0.25;
+      headMesh.add(b);
+    }
+    makeBrow(-1); makeBrow(1);
+
+    // Open jaw with teeth & tongue
+    const jawGroup = new THREE.Group();
+    headMesh.add(jawGroup);
+    jawGroup.position.set(0, -0.55, -0.85);
+    jawGroup.rotation.x = -0.55;          // jaw drops open
+
+    // Lower jaw mass
+    const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.32, 0.95), bodyMat);
+    lowerJaw.position.set(0, 0, -0.05);
+    jawGroup.add(lowerJaw);
+
+    // Upper teeth (attached to head, not jaw)
+    function addTooth(parent, x, y, z, rot = 0, len = 0.22, rad = 0.05) {
+      const t = new THREE.Mesh(new THREE.ConeGeometry(rad, len, 7), toothMat);
+      t.position.set(x, y, z);
+      t.rotation.x = rot;
+      parent.add(t);
+    }
+    for (let i = 0; i < 5; i++) {
+      const t = (i / 4 - 0.5);
+      addTooth(headMesh, t * 0.6, -0.42, -1.05 + Math.abs(t) * 0.05, Math.PI, 0.22 + (i === 0 || i === 4 ? 0.15 : 0), 0.05);
+    }
+    // Lower teeth
+    for (let i = 0; i < 5; i++) {
+      const t = (i / 4 - 0.5);
+      addTooth(jawGroup, t * 0.55, 0.18, -0.15 - Math.abs(t) * 0.04, 0, 0.20 + (i === 0 || i === 4 ? 0.13 : 0), 0.045);
+    }
+
+    // Tongue
+    const tongueShape = new THREE.Shape();
+    tongueShape.moveTo(0, 0);
+    tongueShape.bezierCurveTo(0.25, -0.05, 0.35, -0.4, 0, -0.7);
+    tongueShape.bezierCurveTo(-0.35, -0.4, -0.25, -0.05, 0, 0);
+    const tongueGeo = new THREE.ExtrudeGeometry(tongueShape, { depth: 0.15, bevelEnabled: false });
+    const tongue = new THREE.Mesh(tongueGeo, tongueMat);
+    tongue.rotation.x = -Math.PI / 2;
+    tongue.position.set(0, 0.18, -0.55);
+    tongue.scale.set(0.85, 0.85, 0.85);
+    jawGroup.add(tongue);
+
+    // Branching antler horns (longer)
+    function buildHorn(side) {
+      const horn = new THREE.Group();
+      let prev = new THREE.Vector3();
+      for (let i = 0; i < 7; i++) {
+        const len = 0.75 - i * 0.08;
+        const rad = 0.13 - i * 0.014;
+        const c = new THREE.Mesh(new THREE.ConeGeometry(rad, len, 8), hornMat);
+        c.position.copy(prev);
+        c.position.y += len * 0.5;
+        c.position.x += side * (i * 0.10);
+        c.position.z -= i * 0.08;
+        c.rotation.z = side * (0.20 + i * 0.10);
+        c.rotation.x = -i * 0.08;
+        horn.add(c);
+        prev = new THREE.Vector3(c.position.x + side * 0.1, c.position.y + len * 0.5, c.position.z - 0.06);
+      }
+      // Side prong
+      const prong = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.5, 8), hornMat);
+      prong.position.set(side * 0.45, 1.0, -0.4);
+      prong.rotation.z = side * 0.6;
+      prong.rotation.x = -0.4;
+      horn.add(prong);
+      return horn;
+    }
+    const hL = buildHorn(-1); hL.position.set(-0.32, headR * 0.55, 0.10); headMesh.add(hL);
+    const hR = buildHorn( 1); hR.position.set( 0.32, headR * 0.55, 0.10); headMesh.add(hR);
+
+    // Whiskers
     function makeWhisker() {
       const mat = new THREE.MeshStandardMaterial({ color: 0x1a120c, emissive: 0x2a0e04, emissiveIntensity: 0.25, metalness: 0.2, roughness: 0.5 });
       const m = new THREE.Mesh(new THREE.BufferGeometry(), mat);
@@ -434,22 +665,84 @@
     }
     const whiskerL = makeWhisker();
     const whiskerR = makeWhisker();
-
     function rebuildWhisker(mesh, side, t) {
       const pts = [];
-      const N = 26;
+      const N = 28;
       for (let i = 0; i <= N; i++) {
         const u = i / N;
-        const z = -0.95 - u * 6.0;
-        const wave = Math.sin(t * 2.3 + u * 5.5 + side * 1.2) * 0.7 * u;
-        const drop = -u * 0.7;
-        pts.push(new THREE.Vector3(side * (0.28 + u * 0.7 + wave * 0.3), drop + wave * 0.45, z));
+        const z = -1.0 - u * 7.0;
+        const wave = Math.sin(t * 2.3 + u * 5.5 + side * 1.2) * 0.85 * u;
+        const drop = -u * 0.85;
+        pts.push(new THREE.Vector3(side * (0.30 + u * 0.7 + wave * 0.3), drop + wave * 0.45, z));
       }
       const curve = new THREE.CatmullRomCurve3(pts);
-      const newGeo = new THREE.TubeGeometry(curve, 28, 0.045, 6, false);
+      const newGeo = new THREE.TubeGeometry(curve, 30, 0.05, 6, false);
       mesh.geometry.dispose();
       mesh.geometry = newGeo;
     }
+
+    // ============================================================
+    //  Legs — front & back, attached to spine joints by world position
+    // ============================================================
+    function buildLeg(side, isFront) {
+      const leg = new THREE.Group();
+
+      // Shoulder/hip
+      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), limbMat);
+      shoulder.scale.set(1.0, 0.9, 1.0);
+      leg.add(shoulder);
+
+      // Upper limb
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.30, 1.6, 12), limbMat);
+      upper.position.set(side * 0.35, -0.85, 0.0);
+      upper.rotation.z = side * -0.35;
+      leg.add(upper);
+
+      // Knee
+      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), limbMat);
+      knee.position.set(side * 0.78, -1.55, 0.05);
+      leg.add(knee);
+
+      // Forearm
+      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 1.3, 10), limbMat);
+      fore.position.set(side * 0.95, -2.20, 0.20);
+      fore.rotation.z = side * 0.30;
+      fore.rotation.x = -0.2;
+      leg.add(fore);
+
+      // Wrist / paw
+      const paw = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), limbMat);
+      paw.position.set(side * 1.10, -2.85, 0.42);
+      paw.scale.set(1.2, 0.8, 1.0);
+      leg.add(paw);
+
+      // Claws (4)
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 3 - 0.5) * 0.9;
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.45, 7), clawMat);
+        claw.position.set(
+          side * (1.10 + Math.cos(a) * 0.18),
+          -3.05,
+          0.42 + Math.sin(a) * 0.20
+        );
+        claw.rotation.x = 1.2 + Math.sin(a) * 0.3;
+        claw.rotation.z = side * 0.4;
+        leg.add(claw);
+      }
+
+      // Elbow flame tuft attached to knee
+      const elbow = buildElbowTuft();
+      leg.userData = { elbow, side, isFront };
+      return leg;
+    }
+
+    const legs = [
+      { idx: 9,  side: -1, isFront: true,  mesh: buildLeg(-1, true)  },
+      { idx: 9,  side:  1, isFront: true,  mesh: buildLeg( 1, true)  },
+      { idx: 28, side: -1, isFront: false, mesh: buildLeg(-1, false) },
+      { idx: 28, side:  1, isFront: false, mesh: buildLeg( 1, false) },
+    ];
+    legs.forEach(l => scene.add(l.mesh));
 
     // ============================================================
     //  Spine animation — animated S-curve, head tracks mouse
@@ -457,9 +750,7 @@
     const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
 
     function spineSample(t, time) {
-      // t ∈ [0,1] from head (0) to tail (1)
-      // Anchor point in world space, sweeping through a flowing S
-      const ar = 14;                                         // arc radius
+      const ar = 14;
       const phase = time * 0.18;
       const x =  Math.sin((1 - t) * 3.4 + phase) * ar
               + Math.sin((1 - t) * 1.2 + phase * 0.7) * 4
@@ -477,64 +768,80 @@
     const tmp2 = new THREE.Vector3();
 
     function updateDragon(time) {
-      // Sample base spine path
+      // Sample base path
       for (let i = 0; i < SPINE_N; i++) {
         const t = i / (SPINE_N - 1);
         const p = spineSample(t, time);
         spine[i].set(p.x, p.y, p.z);
       }
-
-      // Bias the head toward the mouse for subtle tracking
+      // Mouse-bias the front of the body
       const headBias = new THREE.Vector3(mouse.x * 6, mouse.y * 4, mouse.x * 1.5);
-      // Falloff over the first ~10 segments
-      for (let i = 0; i < 12; i++) {
-        const w = (1 - i / 12) * 0.7;
+      for (let i = 0; i < 14; i++) {
+        const w = (1 - i / 14) * 0.7;
         spine[i].x += headBias.x * w;
         spine[i].y += headBias.y * w;
         spine[i].z += headBias.z * w;
       }
-
-      // Apply to meshes + orient toward next-forward joint
+      // Apply to meshes + look-at forward joint
       for (let i = 0; i < SPINE_N; i++) {
         const seg = segments[i];
         seg.group.position.copy(spine[i]);
-        // Look from this segment toward the previous (forward) one — head looks ahead
         const target = i === 0
           ? tmp.copy(spine[0]).add(tmp2.subVectors(spine[0], spine[1]).normalize())
           : spine[i - 1];
         seg.group.lookAt(target);
       }
-
-      // Mane light follows nape (segment 3)
-      maneLight.position.copy(spine[3]);
+      maneLight.position.copy(spine[2]);
 
       rebuildWhisker(whiskerL, -1, time);
       rebuildWhisker(whiskerR,  1, time);
+
+      // Animate flames (dragon body + elbow tufts) — scale wobble, sway
+      function animateFlame(obj) {
+        if (obj.userData && obj.userData.baseScale !== undefined) {
+          const u = obj.userData;
+          const s = u.baseScale * (0.85 + 0.25 * Math.sin(time * 6 + u.phase));
+          obj.scale.set(s, s * (0.9 + 0.15 * Math.sin(time * 8 + u.phase)), s);
+          obj.rotation.z = Math.sin(time * 3 + u.phase) * u.sway * 0.3;
+        }
+      }
+      dragonGroup.traverse(animateFlame);
+      for (const tuft of elbowFlames) tuft.traverse(animateFlame);
+
+      // Legs hang vertically, attached to their spine joint with lateral offset
+      const upWorld = new THREE.Vector3(0, 1, 0);
+      for (const L of legs) {
+        const a = spine[L.idx];
+        const b = spine[Math.min(L.idx + 1, SPINE_N - 1)];
+        tmp.subVectors(a, b).normalize();                     // segment forward
+        const right = tmp2.crossVectors(tmp, upWorld).normalize();
+        L.mesh.position.copy(a).addScaledVector(right, L.side * 0.7).addScalar(0);
+        L.mesh.position.y -= 0.2;                             // sit slightly under the spine
+        // Yaw to follow segment direction; otherwise hang straight down
+        L.mesh.rotation.set(0, Math.atan2(tmp.x, tmp.z), 0);
+        // Elbow flame at knee height, biased outward
+        const elbowPos = a.clone().addScaledVector(right, L.side * 1.0);
+        elbowPos.y -= 1.55;
+        L.mesh.userData.elbow.position.copy(elbowPos);
+      }
     }
 
     // ============================================================
     //  Cherry blossom petals (instanced)
     // ============================================================
-    const PETAL_COUNT = 260;
-
-    // Petal shape
+    const PETAL_COUNT = 320;
     const petalShape = new THREE.Shape();
     petalShape.moveTo(0, 0);
     petalShape.bezierCurveTo(0.55, 0.25, 0.55, 0.85, 0, 1.05);
     petalShape.bezierCurveTo(-0.55, 0.85, -0.55, 0.25, 0, 0);
-    const petalGeo = new THREE.ShapeGeometry(petalShape, 6);
+    const petalGeo = new THREE.ShapeGeometry(petalShape, 8);
     petalGeo.translate(0, -0.5, 0);
     petalGeo.scale(0.45, 0.45, 0.45);
 
     const petalMat = new THREE.MeshStandardMaterial({
-      color: COL.PETAL_LIGHT,
-      emissive: COL.PETAL_DEEP,
-      emissiveIntensity: 0.25,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.95,
-      roughness: 0.6,
-      metalness: 0.0,
+      color: COL.PETAL_LIGHT, emissive: COL.PETAL_DEEP, emissiveIntensity: 0.25,
+      side: THREE.DoubleSide, transparent: true, opacity: 0.95,
+      roughness: 0.6, metalness: 0.0,
     });
 
     const petals = new THREE.InstancedMesh(petalGeo, petalMat, PETAL_COUNT);
@@ -546,7 +853,6 @@
     const petalDummy = new THREE.Object3D();
     const petalColor = new THREE.Color();
 
-    // Per-instance color tint
     for (let i = 0; i < PETAL_COUNT; i++) {
       const tone = Math.random();
       petalColor.setHex(tone < 0.5 ? COL.PETAL_LIGHT : COL.PETAL_DEEP);
@@ -555,8 +861,8 @@
     }
     if (petals.instanceColor) petals.instanceColor.needsUpdate = true;
 
-    function spawnPetal(reuseIdx) {
-      const s = petalState[reuseIdx] || (petalState[reuseIdx] = {});
+    function spawnPetal(idx) {
+      const s = petalState[idx] || (petalState[idx] = {});
       s.x = (Math.random() - 0.5) * petalRange.x;
       s.y = petalRange.fallTop + Math.random() * petalRange.y;
       s.z = petalRange.zMin + Math.random() * (petalRange.zMax - petalRange.zMin);
@@ -569,12 +875,11 @@
       s.fall = 0.6 + Math.random() * 0.9;
       s.swayPhase = Math.random() * Math.PI * 2;
       s.swayAmp   = 0.4 + Math.random() * 0.9;
-      s.scale     = 0.6 + Math.random() * 0.9;
+      s.scale     = 0.6 + Math.random() * 1.0;
       return s;
     }
     for (let i = 0; i < PETAL_COUNT; i++) {
       spawnPetal(i);
-      // Pre-distribute vertically so they're already falling at start
       petalState[i].y = petalRange.fallBot + Math.random() * (petalRange.fallTop - petalRange.fallBot + petalRange.y);
     }
 
@@ -588,7 +893,6 @@
         s.ry += s.ryv * dt;
         s.rz += s.rzv * dt;
         if (s.y < petalRange.fallBot) spawnPetal(i);
-
         petalDummy.position.set(s.x, s.y, s.z);
         petalDummy.rotation.set(s.rx, s.ry, s.rz);
         petalDummy.scale.setScalar(s.scale);
@@ -599,7 +903,7 @@
     }
 
     // ============================================================
-    //  God-ray planes (additive, in front of background)
+    //  God-ray planes
     // ============================================================
     const rayGroup = new THREE.Group();
     scene.add(rayGroup);
@@ -608,10 +912,10 @@
         color: 0xffd9a8, transparent: true, opacity: 0.06,
         blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
       });
-      for (let i = 0; i < 6; i++) {
-        const plane = new THREE.Mesh(new THREE.PlaneGeometry(7, 90), rayMat.clone());
-        plane.material.opacity = 0.04 + Math.random() * 0.07;
-        plane.position.set(8 + i * 2.4 + Math.random() * 1.5, 18, -30 - i * 2);
+      for (let i = 0; i < 8; i++) {
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(7, 100), rayMat.clone());
+        plane.material.opacity = 0.04 + Math.random() * 0.08;
+        plane.position.set(7 + i * 2.6 + Math.random() * 1.6, 18, -28 - i * 2);
         plane.rotation.z = -0.55 + (Math.random() - 0.5) * 0.06;
         plane.userData.basePos = plane.position.clone();
         rayGroup.add(plane);
@@ -630,9 +934,6 @@
     }, { passive: true });
     addEventListener('pointerleave', () => { mouse.tx = 0; mouse.ty = 0; });
 
-    // ============================================================
-    //  Resize
-    // ============================================================
     addEventListener('resize', () => {
       const w = innerWidth, h = innerHeight;
       camera.aspect = w / h;
@@ -648,7 +949,7 @@
     // ============================================================
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.85, 0.6, 0.18);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.0, 0.6, 0.18);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
 
@@ -663,13 +964,11 @@
       const dt = Math.min(clock.getDelta(), 1/30);
       time += dt;
 
-      // Smooth mouse
       mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 5);
       mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 5);
       bgUniforms.uTime.value = time;
       bgUniforms.uMouse.value.set(mouse.x, mouse.y);
 
-      // Parallax on mountain layers (deeper = less movement)
       mountainsFar.position.x  = -mouse.x * 1.0;
       mountainsFar.position.y  = -10 - mouse.y * 0.8;
       mountainsMid.position.x  = -mouse.x * 2.4;
@@ -677,20 +976,16 @@
       mountainsNear.position.x = -mouse.x * 4.5;
       mountainsNear.position.y = -10 - mouse.y * 2.8;
 
-      // Mist drift
       for (const m of mistGroup.children) {
         const u = m.userData;
         m.position.x = u.baseX + Math.sin(time * 0.15 + u.driftPhase) * 8 - mouse.x * 3;
         m.position.y += Math.sin(time * 0.4 + u.driftPhase) * 0.01;
       }
-
-      // God rays gentle sway
       for (const r of rayGroup.children) {
         r.position.x = r.userData.basePos.x + Math.sin(time * 0.3 + r.position.z) * 0.3 - mouse.x * 0.6;
-        r.material.opacity = (0.04 + 0.04 * (0.5 + 0.5 * Math.sin(time * 0.6 + r.position.z))) ;
+        r.material.opacity = 0.04 + 0.04 * (0.5 + 0.5 * Math.sin(time * 0.6 + r.position.z));
       }
 
-      // Camera parallax
       camera.position.x = mouse.x * 1.6;
       camera.position.y = 2 + mouse.y * 1.0;
       camera.lookAt(mouse.x * 0.5, 2 + mouse.y * 0.5, 0);
