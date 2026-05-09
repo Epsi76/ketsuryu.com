@@ -57,6 +57,7 @@
 
     const COLOR_LIGHT = new THREE.Color(0xffd1de);
     const COLOR_DEEP  = new THREE.Color(0xff8aa8);
+    const COLOR_PALE  = new THREE.Color(0xfff0f5);   // rare brighter petals
 
     const dummy = new THREE.Object3D();
     const tmpColor = new THREE.Color();
@@ -96,8 +97,12 @@
         };
         state.push(s);
 
-        // Per-instance color tint
-        tmpColor.copy(COLOR_LIGHT).lerp(COLOR_DEEP, Math.random());
+        // Per-instance color tint: ~15% are noticeably paler
+        if (Math.random() < 0.15) {
+          tmpColor.copy(COLOR_PALE);
+        } else {
+          tmpColor.copy(COLOR_LIGHT).lerp(COLOR_DEEP, Math.random());
+        }
         tmpColor.offsetHSL(0, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.08);
         inst.setColorAt(i, tmpColor);
       }
