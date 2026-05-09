@@ -50,9 +50,9 @@
     // ---------- Three parallax layers ----------
     // Each layer: { group, instMesh, state[], factor, fall, count, sizeMul, opacity, zRange }
     const layers = [
-      { factor: 0.8,  count: 70,  fall: [0.8, 1.4], size: [0.7, 1.2],  opacity: 0.55, zRange: [-30, -18] }, // far
-      { factor: 1.6,  count: 90,  fall: [1.1, 1.9], size: [0.9, 1.4],  opacity: 0.85, zRange: [-15,  -3] }, // mid
-      { factor: 3.2,  count: 60,  fall: [1.6, 2.6], size: [1.2, 1.9],  opacity: 1.00, zRange: [  0,  10] }, // near
+      { factor: 1.0,  count: 70,  fall: [0.8, 1.4], size: [0.7, 1.2],  opacity: 0.55, zRange: [-30, -18] }, // far
+      { factor: 2.6,  count: 90,  fall: [1.1, 1.9], size: [0.9, 1.4],  opacity: 0.85, zRange: [-15,  -3] }, // mid
+      { factor: 5.8,  count: 60,  fall: [1.6, 2.6], size: [1.2, 1.9],  opacity: 1.00, zRange: [  0,  10] }, // near
     ];
 
     const COLOR_LIGHT = new THREE.Color(0xffd1de);
@@ -144,7 +144,7 @@
       // Parallax: shift each layer opposite to the mouse, deeper = subtler
       for (const layer of layers) {
         layer.group.position.x = -mouse.x * layer.factor;
-        layer.group.position.y = -mouse.y * layer.factor * 0.6;
+        layer.group.position.y = -mouse.y * layer.factor * 0.8;
 
         const st = layer.state;
         for (let i = 0; i < st.length; i++) {
@@ -171,8 +171,8 @@
       }
 
       // Subtle camera parallax for extra depth feel
-      camera.position.x = mouse.x * 0.6;
-      camera.position.y = mouse.y * 0.4;
+      camera.position.x = mouse.x * 1.2;
+      camera.position.y = mouse.y * 0.8;
       camera.lookAt(0, 0, 0);
 
 
