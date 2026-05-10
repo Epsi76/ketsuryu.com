@@ -47,33 +47,37 @@
     petalGeo.translate(0, -0.5, 0);
     petalGeo.scale(0.5, 0.5, 0.5);
 
-    // ---------- Soft blurred petal sprite for the far layer ----------
-    function makeBlurredPetalTex() {
-      const size = 128;
-      const c = document.createElement('canvas');
-      c.width = c.height = size;
-      const ctx = c.getContext('2d');
-      ctx.filter = 'blur(8px)';
+    // Blurred petal sprite for the far layer (depth-of-field feel)
+    function makeBlurredPetalTexture() {
+      const size = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = 'blur(14px)';
       ctx.fillStyle = '#ffffff';
-      const cx = size / 2, cy = size / 2, r = size * 0.28;
+      const cx = size / 2;
+      const top = size * 0.20;
+      const bot = size * 0.82;
+      const halfW = size * 0.26;
       ctx.beginPath();
-      ctx.moveTo(cx, cy + r);
-      ctx.bezierCurveTo(cx + r * 1.1, cy + r * 0.5, cx + r * 1.1, cy - r * 1.15, cx, cy - r * 1.15);
-      ctx.bezierCurveTo(cx - r * 1.1, cy - r * 1.15, cx - r * 1.1, cy + r * 0.5, cx, cy + r);
+      ctx.moveTo(cx, bot);
+      ctx.bezierCurveTo(cx + halfW, bot - (bot - top) * 0.30, cx + halfW, top + (bot - top) * 0.15, cx, top);
+      ctx.bezierCurveTo(cx - halfW, top + (bot - top) * 0.15, cx - halfW, bot - (bot - top) * 0.30, cx, bot);
+      ctx.closePath();
       ctx.fill();
-      const tex = new THREE.CanvasTexture(c);
+      const tex = new THREE.CanvasTexture(canvas);
       tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
+      tex.anisotropy = 4;
       return tex;
     }
-    const blurredPetalTex = makeBlurredPetalTex();
-    const blurredPetalGeo = new THREE.PlaneGeometry(0.75, 1.15);
+    const blurredPetalTex = makeBlurredPetalTexture();
+    const blurredPetalGeo = new THREE.PlaneGeometry(0.85, 1.0);
 
     // ---------- Three parallax layers ----------
     // Each layer: { group, instMesh, state[], factor, fall, count, sizeMul, opacity, zRange }
     const layers = [
-      { factor: 1.0,  count: 70,  fall: [0.8, 1.4], size: [1.1, 1.8],  opacity: 0.55, zRange: [-30, -18], blurred: true }, // far
+      { factor: 1.0,  count: 70,  fall: [0.8, 1.4], size: [0.7, 1.2],  opacity: 0.55, zRange: [-30, -18], blurred: true }, // far
       { factor: 2.6,  count: 90,  fall: [1.1, 1.9], size: [0.9, 1.4],  opacity: 0.85, zRange: [-15,  -3] }, // mid
       { factor: 5.8,  count: 60,  fall: [1.6, 2.6], size: [1.2, 1.9],  opacity: 1.00, zRange: [  0,  10] }, // near
     ];
@@ -86,16 +90,17 @@
     const tmpColor = new THREE.Color();
 
     for (const layer of layers) {
-      const mat = new THREE.MeshBasicMaterial({
+      const matProps = {
         color: 0xffffff,                    // tinted via instanceColor
         side: THREE.DoubleSide,
         transparent: true,
         opacity: layer.opacity,
         depthWrite: false,
-        map: layer.blurred ? blurredPetalTex : null,
-      });
-      const geo = layer.blurred ? blurredPetalGeo : petalGeo;
-      const inst = new THREE.InstancedMesh(geo, mat, layer.count);
+      };
+      if (layer.blurred) matProps.map = blurredPetalTex;
+      const mat = new THREE.MeshBasicMaterial(matProps);
+      const geom = layer.blurred ? blurredPetalGeo : petalGeo;
+      const inst = new THREE.InstancedMesh(geom, mat, layer.count);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
       // Per-layer group for parallax
@@ -118,7 +123,6 @@
           fall: layer.fall[0] + Math.random() * (layer.fall[1] - layer.fall[0]),
           swayPhase: Math.random() * Math.PI * 2,
           swayAmp: 0.5 + Math.random() * 0.9,
-          windFactor: 0.75 + Math.random() * 0.5,   // per-petal wind susceptibility
           scale: layer.size[0] + Math.random() * (layer.size[1] - layer.size[0]),
         };
         state.push(s);
@@ -153,36 +157,6 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
-    // ---------- Wind (right -> left) with random gusts ----------
-    const wind = {
-      base: -1.4,          // stronger constant leftward drift
-      gust: 0,             // current gust contribution (smoothed)
-      gustTarget: 0,       // target gust contribution
-      nextChange: 2 + Math.random() * 3,  // when current state ends
-      active: false,
-    };
-
-    function updateWind(t, dt) {
-      // Smooth toward target so gusts ramp in/out naturally
-      const ease = wind.active ? 1.4 : 0.9;
-      wind.gust += (wind.gustTarget - wind.gust) * Math.min(1, dt * ease);
-
-      if (t >= wind.nextChange) {
-        if (wind.active) {
-          // End gust, schedule next gap
-          wind.gustTarget = 0;
-          wind.active = false;
-          wind.nextChange = t + 3 + Math.random() * 7;
-        } else {
-          // Start a new gust with random strength + longer duration (5–11s)
-          const strength = 2.0 + Math.random() * 3.5;  // extra leftward push
-          wind.gustTarget = -strength;
-          wind.active = true;
-          wind.nextChange = t + 5.0 + Math.random() * 6.0;
-        }
-      }
-    }
-
     // ---------- Loop ----------
     const clock = new THREE.Clock();
     let time = 0;
@@ -197,58 +171,24 @@
       mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 4);
       mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 4);
 
-      updateWind(time, dt);
-      const windX = wind.base + wind.gust;
-      const gustMag = Math.abs(wind.gust);
-
       // Parallax: shift each layer opposite to the mouse, deeper = subtler
       for (const layer of layers) {
         layer.group.position.x = -mouse.x * layer.factor;
         layer.group.position.y = -mouse.y * layer.factor * 0.8;
 
         const st = layer.state;
-
-        // During gusts, pluck a few low/leftward petals each frame and stream them in from the right edge
-        if (wind.active && gustMag > 0.4) {
-          const burstRate = dt * 6 * Math.min(2, gustMag / 2);
-          const tries = Math.ceil(burstRate);
-          for (let b = 0; b < tries; b++) {
-            if (Math.random() < burstRate / tries) {
-              const k = (Math.random() * st.length) | 0;
-              const tgt = st[k];
-              if (tgt.y < 4 || tgt.x < -10) {
-                // Spawn anywhere along the right edge at any height
-                tgt.x = 25 + Math.random() * 22;
-                tgt.y = Y_BOT + Math.random() * (Y_TOP - Y_BOT + 6);
-              }
-            }
-          }
-        }
-
         for (let i = 0; i < st.length; i++) {
           const s = st[i];
           s.y -= s.fall * dt;
-          s.x += (Math.sin(time * 0.7 + s.swayPhase) * s.swayAmp + windX * s.windFactor) * dt;
+          s.x += Math.sin(time * 0.7 + s.swayPhase) * s.swayAmp * dt;
           s.z += Math.cos(time * 0.5 + s.swayPhase * 1.3) * s.swayAmp * 0.4 * dt;
-          // Gusts add a bit of tumble
-          s.rx += (s.rxv + gustMag * 0.15 * s.windFactor) * dt;
-          s.ry += (s.ryv + gustMag * 0.25 * s.windFactor) * dt;
+          s.rx += s.rxv * dt;
+          s.ry += s.ryv * dt;
           s.rz += s.rzv * dt;
 
           if (s.y < Y_BOT) {
-            // During gusts, mix top entries with right-edge entries (any height)
-            if (wind.active && Math.random() < 0.6) {
-              s.x = 22 + Math.random() * 25;
-              s.y = Y_BOT + Math.random() * (Y_TOP - Y_BOT + 4);
-            } else {
-              s.y = Y_TOP + Math.random() * 6;
-              s.x = (Math.random() - 0.5) * 60;
-            }
-          }
-          // Recycle petals blown off the left edge: come back in from the right at any height
-          if (s.x < -45) {
-            s.x = 28 + Math.random() * 20;
-            s.y = Y_BOT + Math.random() * (Y_TOP - Y_BOT);
+            s.y = Y_TOP + Math.random() * 6;
+            s.x = (Math.random() - 0.5) * 60;
           }
 
           dummy.position.set(s.x, s.y, s.z);
