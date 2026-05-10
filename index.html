@@ -12,9 +12,98 @@
       background: #000;
     }
     canvas { display: block; }
+    #fs-btn {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.35);
+      color: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      cursor: pointer;
+      opacity: 0.45;
+      transition: opacity 0.25s ease, background 0.2s ease, color 0.2s ease;
+      z-index: 10;
+    }
+    #fs-btn:hover, #fs-btn:focus-visible {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      outline: none;
+    }
+    #fs-btn svg { display: block; }
+
+    #quote {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(82vw, 720px);
+      text-align: center;
+      color: rgba(255, 240, 245, 0.93);
+      font-family: 'Georgia', 'Hiragino Mincho ProN', 'Yu Mincho', 'Times New Roman', serif;
+      font-size: clamp(15px, 2.1vw, 24px);
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.75), 0 0 28px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      user-select: none;
+      opacity: 0;
+      filter: blur(16px);
+      transition: opacity 1.8s ease, filter 1.8s ease;
+      z-index: 5;
+    }
+    #quote.visible {
+      opacity: 1;
+      filter: blur(0);
+    }
+    #quote .text {
+      display: block;
+      font-style: italic;
+    }
+    #quote .author {
+      display: block;
+      margin-top: 0.7em;
+      font-size: 0.78em;
+      font-style: normal;
+      color: rgba(255, 200, 215, 0.72);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    /* In fullscreen: hidden by default, revealed only when hovering the bottom-right 30% zone */
+    body.is-fs #fs-btn {
+      opacity: 0;
+      pointer-events: none;
+    }
+    body.is-fs #fs-btn.reveal {
+      opacity: 0.85;
+      pointer-events: auto;
+    }
+    body.is-fs #fs-btn.reveal:hover {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
+  <div id="quote" aria-hidden="true">
+    <span class="text"></span>
+    <span class="author"></span>
+  </div>
+
+  <button id="fs-btn" type="button" aria-label="Plein écran" title="Plein écran (double-clic ou Échap pour quitter)">
+    <svg id="fs-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+    </svg>
+  </button>
+
   <script type="importmap">
   {
     "imports": {
@@ -28,15 +117,30 @@
 
     // ---------- Scene / Camera / Renderer ----------
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+    scene.background = null; // both renderers use transparent clear; body bg shows through
 
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
     camera.position.set(0, 0, 20);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    document.body.appendChild(renderer.domElement);
+    // Two transparent canvases so the quote overlay can sit between them:
+    //   rendererBack  (z-index 0)  → far + mid layers (behind the text)
+    //   #quote        (z-index 5)
+    //   rendererFront (z-index 6)  → near layer only (in front of the text)
+    function makeRenderer(zIndex) {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      r.setPixelRatio(Math.min(devicePixelRatio, 2));
+      r.setSize(innerWidth, innerHeight);
+      r.setClearColor(0x000000, 0);
+      const el = r.domElement;
+      el.style.position = 'fixed';
+      el.style.inset = '0';
+      el.style.zIndex = String(zIndex);
+      el.style.pointerEvents = 'none';
+      document.body.appendChild(el);
+      return r;
+    }
+    const rendererBack  = makeRenderer(0);
+    const rendererFront = makeRenderer(6);
 
     // ---------- Petal geometry (Bezier shape) ----------
     const petalShape = new THREE.Shape();
@@ -154,7 +258,8 @@
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
+      rendererBack.setSize(innerWidth, innerHeight);
+      rendererFront.setSize(innerWidth, innerHeight);
     });
 
     // ---------- Loop ----------
@@ -205,10 +310,448 @@
       camera.position.y = mouse.y * 0.8;
       camera.lookAt(0, 0, 0);
 
+      // Back pass: far + mid (drawn behind the quote overlay)
+      layers[0].group.visible = true;
+      layers[1].group.visible = true;
+      layers[2].group.visible = false;
+      rendererBack.render(scene, camera);
 
-      renderer.render(scene, camera);
+      // Front pass: near only (drawn in front of the quote overlay)
+      layers[0].group.visible = false;
+      layers[1].group.visible = false;
+      layers[2].group.visible = true;
+      rendererFront.render(scene, camera);
     }
     tick();
+
+    // ---------- Fullscreen toggle (button click + double-click anywhere; Escape exits natively) ----------
+    const fsBtn = document.getElementById('fs-btn');
+    const fsIcon = document.getElementById('fs-icon');
+    const ICON_EXPAND   = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    const ICON_COMPRESS = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
+
+    function toggleFullscreen() {
+      const doc = document;
+      const el  = document.documentElement;
+      const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+      if (!isFs) {
+        (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+      } else {
+        (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+      }
+    }
+
+    fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFullscreen();
+    });
+    addEventListener('dblclick', (e) => {
+      if (e.target.closest('#fs-btn')) return;
+      toggleFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = !!document.fullscreenElement;
+      document.body.classList.toggle('is-fs', isFs);
+      fsIcon.innerHTML = isFs ? ICON_COMPRESS : ICON_EXPAND;
+      fsBtn.setAttribute('aria-label', isFs ? 'Quitter le plein écran' : 'Plein écran');
+      if (!isFs) fsBtn.classList.remove('reveal');
+    });
+
+    // Reveal the FS button only when the cursor is in the bottom-right 30% zone (fullscreen only)
+    addEventListener('pointermove', (e) => {
+      if (!document.body.classList.contains('is-fs')) return;
+      const inZone = e.clientX > innerWidth * 0.7 && e.clientY > innerHeight * 0.7;
+      fsBtn.classList.toggle('reveal', inZone);
+    }, { passive: true });
+    addEventListener('pointerleave', () => fsBtn.classList.remove('reveal'));
+
+    // ---------- Random Asian wisdom quotes (fade-in + un-blur, hold, fade-out, gap, loop) ----------
+    const QUOTES = [
+      // Lao Tseu
+      { t: "Un voyage de mille lieues commence par un seul pas.", a: "Lao Tseu" },
+      { t: "Connaître les autres est sagesse ; se connaître soi-même est sagesse supérieure.", a: "Lao Tseu" },
+      { t: "Vaincre les autres demande de la force ; se vaincre soi-même demande de la puissance.", a: "Lao Tseu" },
+      { t: "Celui qui sait ne parle pas ; celui qui parle ne sait pas.", a: "Lao Tseu" },
+      { t: "Rien au monde n'est plus souple que l'eau, et pourtant rien ne lui résiste.", a: "Lao Tseu" },
+      { t: "Cédez et vous l'emporterez.", a: "Lao Tseu" },
+      { t: "Plus on s'éloigne, moins on connaît.", a: "Lao Tseu" },
+      { t: "Qui sait qu'il en sait assez sera toujours assez riche.", a: "Lao Tseu" },
+      { t: "L'arbre qu'il faut deux bras pour entourer naît d'une petite graine.", a: "Lao Tseu" },
+      { t: "Une tour de neuf étages s'élève d'un humble tas de terre.", a: "Lao Tseu" },
+      { t: "Gouverner un grand pays est comme cuire un petit poisson.", a: "Lao Tseu" },
+      { t: "Quand je lâche prise sur ce que je suis, je deviens ce que je pourrais être.", a: "Lao Tseu" },
+      { t: "L'homme sage agit sans agir, enseigne sans parler.", a: "Lao Tseu" },
+      { t: "La nature ne se hâte point, et pourtant tout est accompli.", a: "Lao Tseu" },
+      { t: "Le sage ne s'attache à rien, donc rien ne lui échappe.", a: "Lao Tseu" },
+      { t: "Qui se contente de ce qu'il a est riche.", a: "Lao Tseu" },
+      { t: "La douceur triomphe de la dureté.", a: "Lao Tseu" },
+      { t: "Réussir sans s'enorgueillir, agir sans rien attendre, voilà la vertu suprême.", a: "Lao Tseu" },
+      { t: "Connaître son ignorance est la meilleure part de la connaissance.", a: "Lao Tseu" },
+      { t: "Le sage ne thésaurise rien : plus il vit pour autrui, plus il est lui-même.", a: "Lao Tseu" },
+      { t: "Aucun homme n'est plus sage que celui qui sait être ignorant.", a: "Lao Tseu" },
+      { t: "Faute de réformer ses fautes, on en commet une autre.", a: "Lao Tseu" },
+      { t: "Quand on est libre du désir, on contemple le mystère ; quand on en est rempli, on n'en voit que la manifestation.", a: "Lao Tseu" },
+      { t: "Anticipe le difficile en t'occupant du facile, agis sur le grand par les petites choses.", a: "Lao Tseu" },
+      { t: "L'homme libre marche sans laisser de trace.", a: "Lao Tseu" },
+
+      // Confucius
+      { t: "N'impose pas aux autres ce que tu ne voudrais pas qu'on t'impose.", a: "Confucius" },
+      { t: "Apprendre sans réfléchir est vain ; réfléchir sans apprendre est dangereux.", a: "Confucius" },
+      { t: "Choisis un travail que tu aimes et tu n'auras pas à travailler un seul jour de ta vie.", a: "Confucius" },
+      { t: "Le silence est un véritable ami qui ne trahit jamais.", a: "Confucius" },
+      { t: "L'homme supérieur est exigeant envers lui-même ; l'homme vulgaire l'est envers les autres.", a: "Confucius" },
+      { t: "L'homme noble est calme et serein ; l'homme vulgaire est anxieux et tourmenté.", a: "Confucius" },
+      { t: "Notre plus grande gloire n'est pas de ne jamais tomber, mais de nous relever à chaque chute.", a: "Confucius" },
+      { t: "Celui qui pose une question est sot un instant ; celui qui ne la pose pas l'est toute sa vie.", a: "Confucius" },
+      { t: "Mieux vaut allumer une bougie que maudire l'obscurité.", a: "Confucius" },
+      { t: "La vie est vraiment simple, mais nous insistons pour la rendre compliquée.", a: "Confucius" },
+      { t: "Apprendre, et à temps fixé mettre en pratique : n'est-ce pas là un plaisir ?", a: "Confucius" },
+      { t: "Quand il est évident que les buts ne peuvent être atteints, n'ajustez pas les buts, ajustez les actions.", a: "Confucius" },
+      { t: "Là où il y a la volonté, il y a un chemin.", a: "Confucius" },
+      { t: "Trois choses se cachent difficilement : le soleil, la lune et la vérité.", a: "Confucius" },
+      { t: "Demander conseil, c'est se mettre à l'école d'autrui.", a: "Confucius" },
+      { t: "Celui qui a déplacé une montagne, c'est celui qui a commencé par enlever les petites pierres.", a: "Confucius" },
+      { t: "Nous avons deux vies, et la deuxième commence le jour où l'on se rend compte qu'on n'en a qu'une.", a: "Confucius" },
+      { t: "Ne te mesure pas à la hauteur des montagnes, mais à la hauteur de tes idéaux.", a: "Confucius" },
+      { t: "Le sage tient à éprouver de la honte avant que ses actes ne suivent ses paroles.", a: "Confucius" },
+      { t: "Aimer le savoir et ne pas apprendre, c'est aimer la nourriture sans manger.", a: "Confucius" },
+      { t: "Quiconque commet une erreur et ne la corrige pas commet une seconde erreur.", a: "Confucius" },
+      { t: "Avant d'entreprendre une vengeance, creuse deux tombes.", a: "Confucius" },
+      { t: "L'homme qui sait dompter son cœur est plus fort que celui qui prend mille villes.", a: "Confucius" },
+      { t: "Étudie le passé pour comprendre l'avenir.", a: "Confucius" },
+      { t: "Quand l'évidence est là, ne pas agir est lâcheté.", a: "Confucius" },
+
+      // Sun Tzu
+      { t: "Connais ton ennemi et connais-toi toi-même : eussiez-vous cent guerres à soutenir, cent fois vous serez victorieux.", a: "Sun Tzu" },
+      { t: "L'art suprême de la guerre est de soumettre l'ennemi sans combat.", a: "Sun Tzu" },
+      { t: "La rapidité est l'essence de la guerre.", a: "Sun Tzu" },
+      { t: "Les opportunités se multiplient à mesure qu'on les saisit.", a: "Sun Tzu" },
+      { t: "Apparaissez où l'ennemi ne peut aller, allez où il ne vous attend pas.", a: "Sun Tzu" },
+      { t: "Quand fort, paraître faible ; quand faible, paraître fort.", a: "Sun Tzu" },
+      { t: "Le meilleur stratège évite la bataille.", a: "Sun Tzu" },
+      { t: "Au milieu du chaos se cache aussi l'opportunité.", a: "Sun Tzu" },
+      { t: "Celui qui se connaît n'est pas mis en danger.", a: "Sun Tzu" },
+      { t: "La victoire appartient à celui qui sait vaincre avant de combattre.", a: "Sun Tzu" },
+      { t: "Prépare-toi pour ce qui est difficile pendant qu'il est encore facile.", a: "Sun Tzu" },
+      { t: "L'eau ne suit pas un cours fixe : c'est la stratégie du sage.", a: "Sun Tzu" },
+
+      // Zhuangzi
+      { t: "Le poisson dans l'eau ne sait pas qu'il est dans l'eau.", a: "Zhuangzi" },
+      { t: "Une fois que tu as l'idée, tu peux oublier les mots.", a: "Zhuangzi" },
+      { t: "Heureux celui qui a perdu l'envie d'avoir.", a: "Zhuangzi" },
+      { t: "Ne demande pas à un poisson de grimper aux arbres.", a: "Zhuangzi" },
+      { t: "L'homme parfait emploie son esprit comme un miroir : il n'attire ni ne rejette rien.", a: "Zhuangzi" },
+      { t: "L'homme véritable respire avec les talons, l'homme ordinaire avec la gorge.", a: "Zhuangzi" },
+      { t: "La grenouille au fond du puits ne connaît rien de la mer.", a: "Zhuangzi" },
+      { t: "Le chemin se forme en marchant.", a: "Zhuangzi" },
+      { t: "À celui qui sait se contenter, l'univers entier appartient.", a: "Zhuangzi" },
+
+      // Mencius
+      { t: "Le sage seul est capable de garder son cœur d'enfant.", a: "Mencius" },
+      { t: "L'homme grandit avec ses obstacles.", a: "Mencius" },
+      { t: "Les épreuves trempent le caractère comme le feu trempe l'acier.", a: "Mencius" },
+      { t: "La bienveillance est invincible.", a: "Mencius" },
+      { t: "Ce qui distingue l'homme des bêtes est petit, mais précieux.", a: "Mencius" },
+
+      // Lin Yutang
+      { t: "Celui qui sait passer ses jours dans le calme est sage.", a: "Lin Yutang" },
+      { t: "Une vie tranquille, quelques livres et un thé : voilà la richesse.", a: "Lin Yutang" },
+      { t: "L'humour est l'antidote à la solennité de la vie.", a: "Lin Yutang" },
+
+      // Lu Xun
+      { t: "L'espérance est comme un chemin dans la campagne : à force d'y marcher, il devient.", a: "Lu Xun" },
+      { t: "Ne te plains pas de l'obscurité, allume une lampe.", a: "Lu Xun" },
+
+      // Proverbes chinois
+      { t: "Mieux vaut un voisin proche qu'un parent éloigné.", a: "Proverbe chinois" },
+      { t: "La patience est un arbre dont la racine est amère et les fruits sucrés.", a: "Proverbe chinois" },
+      { t: "Une once d'or n'achète pas une once de temps.", a: "Proverbe chinois" },
+      { t: "Pour la prospérité d'un an, fais pousser du grain ; pour dix ans, plante des arbres ; pour cent ans, éduque les hommes.", a: "Proverbe chinois" },
+      { t: "Mieux vaut avoir un défaut visible qu'une vertu cachée.", a: "Proverbe chinois" },
+      { t: "Un sourire ouvre plus de portes qu'une clé d'or.", a: "Proverbe chinois" },
+      { t: "Le bambou plie sous la tempête, mais ne se brise pas.", a: "Proverbe chinois" },
+      { t: "Une seule étincelle peut embraser toute une plaine.", a: "Proverbe chinois" },
+      { t: "Si tu te trompes de chemin, peu importe la vitesse à laquelle tu cours.", a: "Proverbe chinois" },
+      { t: "Le maître ouvre la porte, mais c'est à toi d'entrer.", a: "Proverbe chinois" },
+      { t: "Le bonheur ne se trouve pas au sommet de la montagne, mais dans la façon de la gravir.", a: "Proverbe chinois" },
+      { t: "Pour savoir ce qu'est une rivière, ne lui demande pas la source mais l'embouchure.", a: "Proverbe chinois" },
+      { t: "Celui qui demande son chemin ne s'égare pas.", a: "Proverbe chinois" },
+      { t: "L'eau qui dort cache aussi des dragons.", a: "Proverbe chinois" },
+      { t: "Une fleur ne fait pas le printemps.", a: "Proverbe chinois" },
+      { t: "Le tigre qui hésite ne vaut pas la guêpe qui pique.", a: "Proverbe chinois" },
+      { t: "Le chemin que l'on parcourt importe plus que la destination.", a: "Proverbe chinois" },
+      { t: "Un seul fil ne tisse pas une toile.", a: "Proverbe chinois" },
+      { t: "Trois centimètres de langue peuvent tuer un homme de six pieds.", a: "Proverbe chinois" },
+      { t: "Garde ta bouche fermée comme une bouteille, et ton esprit ouvert comme un château.", a: "Proverbe chinois" },
+      { t: "Un homme qui ne lit pas ne vaut pas mieux qu'un homme qui ne sait pas lire.", a: "Proverbe chinois" },
+      { t: "On apprend mieux d'un livre qui nous égare que d'un livre qui nous flatte.", a: "Proverbe chinois" },
+      { t: "Un livre est un jardin que l'on porte dans sa poche.", a: "Proverbe chinois" },
+      { t: "Mille amis ne sont pas trop, un seul ennemi est de trop.", a: "Proverbe chinois" },
+      { t: "L'arc trop tendu finit par se briser.", a: "Proverbe chinois" },
+      { t: "Gouverne ta langue comme un cheval rétif.", a: "Proverbe chinois" },
+      { t: "Apprends à écouter, et tu apprendras la sagesse.", a: "Proverbe chinois" },
+      { t: "Un mot doux peut désarmer la fureur.", a: "Proverbe chinois" },
+      { t: "Un cœur en paix voit une fête dans tous les cœurs.", a: "Proverbe chinois" },
+      { t: "L'enseignement éclaire mieux que mille soleils.", a: "Proverbe chinois" },
+      { t: "À cœur vaillant, rien d'impossible.", a: "Proverbe chinois" },
+      { t: "Le savoir n'a pas d'âge.", a: "Proverbe chinois" },
+      { t: "Le riz mûr courbe la tête.", a: "Proverbe chinois" },
+      { t: "L'eau profonde ne fait pas de bruit.", a: "Proverbe chinois" },
+      { t: "Pour celui qui marche lentement, aucun chemin n'est trop long.", a: "Proverbe chinois" },
+      { t: "Goutte à goutte, l'eau perce la pierre.", a: "Proverbe chinois" },
+      { t: "À petit feu, bonne cuisine.", a: "Proverbe chinois" },
+      { t: "Celui qui pense pouvoir est plus fort que celui qui sait pouvoir.", a: "Proverbe chinois" },
+      { t: "Se connaître soi-même, c'est commencer la vraie sagesse.", a: "Proverbe chinois" },
+      { t: "Mieux vaut une fleur dans la main que mille dans la forêt.", a: "Proverbe chinois" },
+      { t: "Tout malheur a un remède : le temps.", a: "Proverbe chinois" },
+      { t: "Une parole donnée vaut un trésor enfoui.", a: "Proverbe chinois" },
+      { t: "Travaille comme si tu vivais cent ans, étudie comme si tu mourais demain.", a: "Proverbe chinois" },
+      { t: "L'âge fait l'homme sage, l'expérience le rend humble.", a: "Proverbe chinois" },
+      { t: "Le sage cache son savoir, l'orgueilleux étale le sien.", a: "Proverbe chinois" },
+      { t: "Quand tu bois l'eau, n'oublie pas la source.", a: "Proverbe chinois" },
+      { t: "Le passé est l'enseignant, le présent l'élève.", a: "Proverbe chinois" },
+      { t: "Un cheval rétif ne se dresse pas en un jour.", a: "Proverbe chinois" },
+      { t: "Plante d'abord, récolte ensuite.", a: "Proverbe chinois" },
+      { t: "L'épée la plus tranchante est la langue.", a: "Proverbe chinois" },
+      { t: "Une main pleine de patience vaut mieux que deux pleines de hâte.", a: "Proverbe chinois" },
+      { t: "Le ciel est haut, mais l'homme y monte par sa vertu.", a: "Proverbe chinois" },
+      { t: "Mieux vaut un mot juste qu'un long discours.", a: "Proverbe chinois" },
+      { t: "Un mot d'amitié réchauffe trois hivers.", a: "Proverbe chinois" },
+      { t: "Travaille la terre, elle te nourrira ; travaille ton esprit, il te grandira.", a: "Proverbe chinois" },
+      { t: "Celui qui ne sait pas sourire ne devrait pas ouvrir boutique.", a: "Proverbe chinois" },
+      { t: "À cœur ouvert, monde ouvert.", a: "Proverbe chinois" },
+      { t: "Mille jours d'études ne valent pas un jour avec un grand maître.", a: "Proverbe chinois" },
+      { t: "Cherche un ami avant d'avoir besoin de lui.", a: "Proverbe chinois" },
+      { t: "Une montagne ne se moque pas d'une autre montagne.", a: "Proverbe chinois" },
+      { t: "L'enfant qui questionne devient un sage ; celui qui ne questionne pas, jamais.", a: "Proverbe chinois" },
+      { t: "Quand on n'a pas d'épée, on apprend à se battre avec sa raison.", a: "Proverbe chinois" },
+      { t: "Le talent vient de l'effort, l'effort de la volonté.", a: "Proverbe chinois" },
+      { t: "Le destin mêle les cartes, l'homme les joue.", a: "Proverbe chinois" },
+      { t: "Une vie sans étude est une nuit sans lune.", a: "Proverbe chinois" },
+      { t: "Avant de blâmer le miroir, regarde ton visage.", a: "Proverbe chinois" },
+      { t: "Le grand fleuve ne refuse pas la petite rivière.", a: "Proverbe chinois" },
+      { t: "Mieux vaut l'humilité d'une fourmi que l'orgueil d'un lion.", a: "Proverbe chinois" },
+      { t: "Une simple parole peut rendre l'hiver chaud trois mois.", a: "Proverbe chinois" },
+      { t: "L'homme se forme dans les épreuves, le bambou dans le vent.", a: "Proverbe chinois" },
+      { t: "Le poisson ne se voit pas dans l'eau ; l'homme ne se voit pas dans la richesse.", a: "Proverbe chinois" },
+      { t: "Un grand voyage commence par un petit pas, un grand homme par un petit acte.", a: "Proverbe chinois" },
+      { t: "Une grande forêt commence par un brin d'herbe.", a: "Proverbe chinois" },
+      { t: "Mieux vaut suivre la route avec mille obstacles que rester immobile.", a: "Proverbe chinois" },
+      { t: "Quand on a honte d'apprendre, on garde son ignorance toute sa vie.", a: "Proverbe chinois" },
+      { t: "Si tu sais, agis ; si tu agis, apprends.", a: "Proverbe chinois" },
+      { t: "Une heure de méditation vaut une nuit de sommeil.", a: "Proverbe chinois" },
+      { t: "Un cœur heureux trouve la fortune partout.", a: "Proverbe chinois" },
+      { t: "Là où il y a la volonté, le ciel ouvre la porte.", a: "Proverbe chinois" },
+      { t: "L'enfant pleure, le sage rit, le sot s'inquiète.", a: "Proverbe chinois" },
+      { t: "Pour bien vieillir, garde un cœur d'enfant.", a: "Proverbe chinois" },
+      { t: "Ne mesure pas la profondeur de l'eau avec les deux pieds.", a: "Proverbe chinois" },
+      { t: "Une rumeur n'est qu'un nuage : le soleil la dissipe.", a: "Proverbe chinois" },
+
+      // Proverbes japonais
+      { t: "Tomber sept fois, se relever huit.", a: "Proverbe japonais" },
+      { t: "Le clou qui dépasse appelle le marteau.", a: "Proverbe japonais" },
+      { t: "Même les singes tombent des arbres.", a: "Proverbe japonais" },
+      { t: "Trois ans sur une pierre la rendent tiède.", a: "Proverbe japonais" },
+      { t: "Une rencontre, une chance unique.", a: "Proverbe japonais" },
+      { t: "Le visage de l'enfant est le miroir de la maison.", a: "Proverbe japonais" },
+      { t: "Quand le vent souffle, le tonnelier prospère.", a: "Proverbe japonais" },
+      { t: "Une grenouille au fond d'un puits ignore l'océan.", a: "Proverbe japonais" },
+      { t: "Mieux vaut voir un visage qu'entendre cent rumeurs.", a: "Proverbe japonais" },
+      { t: "Le tigre meurt et laisse sa peau, l'homme meurt et laisse son nom.", a: "Proverbe japonais" },
+      { t: "Préfère un cœur droit à mille talents.", a: "Proverbe japonais" },
+      { t: "Le maître ne fait que montrer le chemin, c'est à toi de marcher.", a: "Proverbe japonais" },
+      { t: "Plus on monte, plus le vent est fort.", a: "Proverbe japonais" },
+      { t: "Une fleur de cerisier ne dure qu'un printemps, mais en garde l'éclat éternel.", a: "Proverbe japonais" },
+      { t: "L'orgueil précède la chute comme la fleur précède le fruit.", a: "Proverbe japonais" },
+      { t: "Patience pendant un instant évite cent jours de chagrin.", a: "Proverbe japonais" },
+      { t: "Quand on perd, on apprend.", a: "Proverbe japonais" },
+      { t: "Pour le voyageur sage, chaque pas est une demeure.", a: "Proverbe japonais" },
+      { t: "Un sourire ne coûte rien et produit beaucoup.", a: "Proverbe japonais" },
+      { t: "Hâte-toi lentement.", a: "Proverbe japonais" },
+      { t: "L'homme habile apprend de chaque erreur.", a: "Proverbe japonais" },
+      { t: "Le talent sans effort est une fleur sans parfum.", a: "Proverbe japonais" },
+      { t: "À celui qui attend patiemment, le temps ouvre toutes les portes.", a: "Proverbe japonais" },
+      { t: "Une vie sans honneur est plus dure qu'une mort sans honte.", a: "Proverbe japonais" },
+      { t: "Le silence parle plus fort que mille mots.", a: "Proverbe japonais" },
+      { t: "Mieux vaut une larme honnête qu'un sourire forcé.", a: "Proverbe japonais" },
+      { t: "Le passé est un maître sévère, le futur un élève promis.", a: "Proverbe japonais" },
+      { t: "L'âme polie brille comme la lame du sabre.", a: "Proverbe japonais" },
+      { t: "Voir une fois vaut mieux qu'entendre cent fois.", a: "Proverbe japonais" },
+      { t: "Si tu ne marches pas, le chemin ne se forme pas.", a: "Proverbe japonais" },
+      { t: "Le sage écoute davantage qu'il ne parle.", a: "Proverbe japonais" },
+      { t: "L'arbre sans racines ne survit pas au vent.", a: "Proverbe japonais" },
+      { t: "On forge l'épée par mille frappes, l'homme par mille épreuves.", a: "Proverbe japonais" },
+      { t: "Apprends ce que tu peux quand tu peux.", a: "Proverbe japonais" },
+      { t: "Mieux vaut une étoile qui scintille au cœur qu'un soleil qui brûle au front.", a: "Proverbe japonais" },
+      { t: "À l'oiseau qui vole, ne demande pas la route.", a: "Proverbe japonais" },
+      { t: "Le devoir est plus lourd qu'une montagne, la mort plus légère qu'une plume.", a: "Proverbe japonais" },
+      { t: "Une vie courte vécue avec honneur vaut mille ans de honte.", a: "Proverbe japonais" },
+      { t: "Le bambou cède au vent mais ne rompt pas.", a: "Proverbe japonais" },
+      { t: "Les actes parlent plus fort que les serments.", a: "Proverbe japonais" },
+      { t: "Le cœur calme reflète mille étoiles.", a: "Proverbe japonais" },
+      { t: "Là où le cœur va, le pas suit.", a: "Proverbe japonais" },
+      { t: "Le cerisier ne demande pas qui le regarde.", a: "Proverbe japonais" },
+      { t: "Mieux vaut un effort sincère qu'un succès volé.", a: "Proverbe japonais" },
+      { t: "L'eau prend la forme du vase, l'homme la forme de ses amis.", a: "Proverbe japonais" },
+      { t: "Une route droite n'enseigne rien, une route tortueuse forme le voyageur.", a: "Proverbe japonais" },
+      { t: "Avant de juger un homme, marche trois lunes dans ses sandales.", a: "Proverbe japonais" },
+      { t: "Le rire chasse les démons mieux que mille prières.", a: "Proverbe japonais" },
+      { t: "Un cœur reconnaissant attire mille bénédictions.", a: "Proverbe japonais" },
+      { t: "Le savoir est un trésor qui suit son maître partout.", a: "Proverbe japonais" },
+      { t: "Mieux vaut un instant éveillé qu'une vie endormie.", a: "Proverbe japonais" },
+      { t: "L'aube vient pour tous, mais seul le veilleur la voit.", a: "Proverbe japonais" },
+      { t: "Plus la racine est profonde, plus l'arbre dure.", a: "Proverbe japonais" },
+      { t: "Pour gravir une montagne, il faut autant de patience que de courage.", a: "Proverbe japonais" },
+      { t: "Mieux vaut perdre la face que l'âme.", a: "Proverbe japonais" },
+      { t: "Le poète voit dans la pluie ce que d'autres ne voient pas.", a: "Proverbe japonais" },
+      { t: "Le maître est partout pour qui sait observer.", a: "Proverbe japonais" },
+      { t: "Le destin écrit, mais l'homme tient le pinceau.", a: "Proverbe japonais" },
+      { t: "L'eau pure ne craint pas la boue.", a: "Proverbe japonais" },
+      { t: "Une parole gentille fait fondre la glace de trois hivers.", a: "Proverbe japonais" },
+      { t: "L'arbre tombe du côté où il penchait.", a: "Proverbe japonais" },
+      { t: "Le sage admire la lune ; l'insensé montre le doigt.", a: "Proverbe japonais" },
+      { t: "Un long voyage forme la vraie maison.", a: "Proverbe japonais" },
+      { t: "Pour comprendre le ciel, regarde la rivière.", a: "Proverbe japonais" },
+      { t: "L'âme du sabre est dans la main qui le tient.", a: "Proverbe japonais" },
+      { t: "Un haïku peut contenir tout l'univers.", a: "Proverbe japonais" },
+      { t: "Le maître se reconnaît à la sérénité de ses gestes.", a: "Proverbe japonais" },
+      { t: "L'effort discret produit la victoire éclatante.", a: "Proverbe japonais" },
+      { t: "L'arbre fruitier le plus chargé incline le plus bas.", a: "Proverbe japonais" },
+      { t: "Plante un cerisier aujourd'hui, ses fleurs réjouiront demain.", a: "Proverbe japonais" },
+      { t: "Le sabre tranchant ne coupe pas son fourreau.", a: "Proverbe japonais" },
+
+      // Miyamoto Musashi
+      { t: "Aujourd'hui, victoire sur soi-même ; demain, victoire sur les inférieurs ; après-demain, victoire sur les supérieurs.", a: "Miyamoto Musashi" },
+      { t: "Connais le plus petit pour connaître le plus grand.", a: "Miyamoto Musashi" },
+      { t: "L'esprit doit demeurer libre comme l'eau qui s'écoule.", a: "Miyamoto Musashi" },
+      { t: "Ne sois dépendant de qui que ce soit.", a: "Miyamoto Musashi" },
+      { t: "Ne pense pas à acquérir, mais à ne pas perdre.", a: "Miyamoto Musashi" },
+      { t: "Ne regrette jamais ce que tu as fait.", a: "Miyamoto Musashi" },
+      { t: "Sois indifférent à ce que tu aimes ou n'aimes pas.", a: "Miyamoto Musashi" },
+      { t: "N'aie aucune préférence en quoi que ce soit.", a: "Miyamoto Musashi" },
+      { t: "Mille jours d'entraînement pour développer, dix mille pour polir.", a: "Miyamoto Musashi" },
+      { t: "L'esprit doit être large, droit et clair comme le ciel.", a: "Miyamoto Musashi" },
+      { t: "Ne crains pas la mort.", a: "Miyamoto Musashi" },
+
+      // Bashō
+      { t: "Ne suis pas les pas des anciens, cherche ce qu'ils ont cherché.", a: "Matsuo Bashō" },
+      { t: "Chaque jour est un voyage, et le voyage lui-même est la maison.", a: "Matsuo Bashō" },
+      { t: "Apprends de la pierre quand le soleil se couche.", a: "Matsuo Bashō" },
+      { t: "L'art demande une vie de patience pour un instant d'éclat.", a: "Matsuo Bashō" },
+      { t: "Va voir la fleur, mais ne la cueille pas.", a: "Matsuo Bashō" },
+      { t: "Sur une branche morte, un corbeau s'est posé : crépuscule d'automne.", a: "Matsuo Bashō" },
+
+      // Dōgen
+      { t: "Étudier la voie, c'est s'étudier soi-même.", a: "Dōgen" },
+      { t: "S'étudier soi-même, c'est s'oublier.", a: "Dōgen" },
+      { t: "Le temps vole comme une flèche : ne perds pas un instant.", a: "Dōgen" },
+      { t: "Le moment présent est toujours le bon moment.", a: "Dōgen" },
+
+      // Yoshida Kenkō
+      { t: "L'homme parfait n'est ni triste ni joyeux : il est tranquille.", a: "Yoshida Kenkō" },
+      { t: "Il faut chérir l'inachevé : c'est le commencement du beau.", a: "Yoshida Kenkō" },
+      { t: "Que la vie est éphémère ! C'est pour cela qu'elle est belle.", a: "Yoshida Kenkō" },
+
+      // Hagakure / Bushidō
+      { t: "La voie du samouraï se trouve dans la mort.", a: "Hagakure" },
+      { t: "Il faut décider en sept respirations.", a: "Hagakure" },
+      { t: "Sois fier sans arrogance, humble sans servilité.", a: "Bushidō" },
+      { t: "Le sabre est l'âme du samouraï.", a: "Bushidō" },
+      { t: "Vis aujourd'hui comme si c'était ton dernier jour, étudie comme si tu vivais mille ans.", a: "Bushidō" },
+
+      // Mishima
+      { t: "La beauté est ce qui se brise.", a: "Yukio Mishima" },
+      { t: "Vivre est en lui-même un acte de courage.", a: "Yukio Mishima" },
+      { t: "Il n'y a pas de plus grande souffrance que de chercher l'éternité dans le présent.", a: "Yukio Mishima" },
+
+      // Sōseki
+      { t: "Le bonheur est la chose la plus difficile à reconnaître quand on l'a.", a: "Natsume Sōseki" },
+      { t: "Là où il n'y a rien, il y a tout.", a: "Natsume Sōseki" },
+
+      // Kawabata
+      { t: "Le silence du Japon est plus expressif que ses mots.", a: "Yasunari Kawabata" },
+      { t: "La beauté éphémère est la plus profonde.", a: "Yasunari Kawabata" },
+
+      // Kurosawa
+      { t: "Pour faire beau, regarde longuement, jusqu'à oublier ton regard.", a: "Akira Kurosawa" },
+      { t: "Le présent est tout ce que nous avons.", a: "Akira Kurosawa" },
+      { t: "Pour peindre la pluie, peins d'abord le silence.", a: "Akira Kurosawa" },
+
+      // Inamori Kazuo
+      { t: "L'âme se grandit par l'effort quotidien.", a: "Inamori Kazuo" },
+      { t: "Le travail est la voie la plus rapide vers la sagesse.", a: "Inamori Kazuo" },
+
+      // Nitobe Inazō
+      { t: "Le bushidō est l'âme du Japon.", a: "Nitobe Inazō" },
+
+      // Yamamoto Tsunetomo
+      { t: "Médite chaque matin sur la mort, et la vie deviendra plus pleine.", a: "Yamamoto Tsunetomo" },
+
+      // Takuan Sōhō
+      { t: "L'esprit qui ne s'attache à rien est libre comme l'eau qui s'écoule.", a: "Takuan Sōhō" },
+      { t: "Là où l'esprit s'arrête, l'esprit est emprisonné.", a: "Takuan Sōhō" },
+
+      // Linji
+      { t: "Si tu rencontres le Bouddha sur ton chemin, tue-le.", a: "Linji" },
+      { t: "Cherche en toi : tu y trouveras tout.", a: "Linji" },
+
+      // Huang Bo
+      { t: "Ne cherche pas hors de toi ce que tu es déjà.", a: "Huang Bo" },
+
+      // Hakuin
+      { t: "Quel est le son d'une seule main qui applaudit ?", a: "Hakuin" },
+      { t: "Que peut-on offrir de plus précieux que sa propre conscience ?", a: "Hakuin" },
+
+      // Issa
+      { t: "Sous les fleurs de cerisier, il n'y a pas d'étrangers.", a: "Kobayashi Issa" },
+      { t: "Le monde de la rosée est un monde de rosée, et pourtant…", a: "Kobayashi Issa" },
+
+      // Compléments
+      { t: "Celui qui a une véritable autorité n'a pas besoin d'élever la voix.", a: "Proverbe chinois" },
+      { t: "Le sage n'est pas celui qui donne les bonnes réponses, mais celui qui pose les bonnes questions.", a: "Proverbe chinois" },
+      { t: "Là où vont tes pensées, va ta vie.", a: "Proverbe chinois" },
+      { t: "L'homme bon dort tranquille, l'homme injuste éveille les ombres.", a: "Proverbe chinois" },
+      { t: "Le malheur d'un sage tient à son cœur, jamais à sa fortune.", a: "Proverbe chinois" },
+      { t: "Une parole jetée à la légère devient plus tard un sabre.", a: "Proverbe chinois" },
+      { t: "Le rocher ne pleure pas la pluie qui l'a fendu.", a: "Proverbe japonais" },
+      { t: "L'arbre que l'on plante à l'ombre n'aspire pas moins au soleil.", a: "Proverbe japonais" },
+      { t: "Mieux vaut une vie de bambou qu'une vie de roseau brisé.", a: "Proverbe japonais" },
+      { t: "L'éclat du sabre dépend du polissage de l'âme.", a: "Proverbe japonais" },
+      { t: "Le voyageur sage n'a pas de but fixé, mais arrive toujours.", a: "Proverbe japonais" },
+      { t: "L'esprit calme est plus fort que le corps fort.", a: "Proverbe japonais" },
+      { t: "L'homme grand ne hausse pas la voix : il se contente d'agir juste.", a: "Confucius" },
+      { t: "Le sage observe, écoute, puis agit ; le sot agit, parle, puis se justifie.", a: "Proverbe chinois" },
+    ];
+
+    const quoteEl = document.getElementById('quote');
+    const quoteText = quoteEl.querySelector('.text');
+    const quoteAuthor = quoteEl.querySelector('.author');
+    const QUOTE_FADE_MS = 1800;
+    let lastQuoteIdx = -1;
+
+    function pickQuote() {
+      let i;
+      do { i = (Math.random() * QUOTES.length) | 0; } while (QUOTES.length > 1 && i === lastQuoteIdx);
+      lastQuoteIdx = i;
+      return QUOTES[i];
+    }
+    const rrand = (a, b) => a + Math.random() * (b - a);
+    const wait  = (ms) => new Promise(r => setTimeout(r, ms));
+
+    async function quoteLoop() {
+      await wait(2000);
+      while (true) {
+        const q = pickQuote();
+        quoteText.textContent = '« ' + q.t + ' »';
+        quoteAuthor.textContent = q.a;
+        void quoteEl.offsetWidth; // force reflow before transition
+        quoteEl.classList.add('visible');
+        await wait(QUOTE_FADE_MS + rrand(6500, 9500));
+        quoteEl.classList.remove('visible');
+        await wait(QUOTE_FADE_MS + rrand(4000, 7000));
+      }
+    }
+    quoteLoop();
   </script>
 </body>
 </html>
