@@ -1,0 +1,12 @@
+{
+  "name": "KetsuRyu",
+  "short_name": "KetsuRyu",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-maskable.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
+  ],
+  "theme_color": "#0b0b0d",
+  "background_color": "#000000",
+  "display": "standalone",
+  "start_url": "/"
+}

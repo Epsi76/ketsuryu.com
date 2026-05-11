@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>KetsuRyu</title>
+  <defs>
+    <linearGradient id="g" x1="22" y1="6" x2="42" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe2ef"/>
+      <stop offset=".45" stop-color="#fbb6d2"/>
+      <stop offset="1" stop-color="#ec7aa8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="32" cy="29" r="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6a6c6" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#f6a6c6" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="c">
+      <path d="M32 60C46 57 55 44 54 30 53 19 47 9 40 9 37 9.5 34 12 32 17 30 12 27 9.5 24 9 17 9 11 19 10 30 9 44 18 57 32 60Z"/>
+    </clipPath>
+  </defs>
+  <rect width="64" height="64" fill="#0b0b0d"/>
+  <rect width="64" height="64" fill="url(#glow)"/>
+  <g transform="translate(9 7.2) scale(.72) rotate(-15 32 34)">
+    <path d="M32 60C46 57 55 44 54 30 53 19 47 9 40 9 37 9.5 34 12 32 17 30 12 27 9.5 24 9 17 9 11 19 10 30 9 44 18 57 32 60Z" fill="url(#g)" stroke="#d76b97" stroke-width="1.4"/>
+    <g clip-path="url(#c)">
+      <ellipse cx="26" cy="22" rx="10" ry="16" fill="#fff" opacity=".3" transform="rotate(-22 26 22)"/>
+      <path d="M32 57V18" fill="none" stroke="#cf6892" stroke-width="1.1" stroke-linecap="round" opacity=".38"/>
+    </g>
+  </g>
+</svg>

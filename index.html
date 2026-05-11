@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>KetsuRyu</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="mask-icon" href="/favicon.svg" color="#ec7aa8" />
+  <link rel="apple-touch-icon" href="/icon-maskable.svg" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="theme-color" content="#0b0b0d" />
   <style>
     html, body {
       margin: 0; padding: 0;
@@ -573,6 +578,7 @@
     }
 
     // ----- YouTube backend: hidden iframe playing the channel's uploads on shuffle + loop -----
+    const ytlog = (...a) => { try { console.warn('[ketsuryu music]', ...a); } catch (_) {} };
     function loadYouTubeAPI() {
       return new Promise((resolve, reject) => {
         if (window.YT && window.YT.Player) { resolve(); return; }
@@ -580,74 +586,83 @@
         window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') { try { prev(); } catch (_) {} } resolve(); };
         const s = document.createElement('script');
         s.src = 'https://www.youtube.com/iframe_api';
-        s.onerror = () => reject(new Error('yt-api-load-failed'));
+        s.onerror = () => { ytlog('IFrame API script failed to load.'); reject(new Error('yt-api-load-failed')); };
         document.head.appendChild(s);
-        setTimeout(() => reject(new Error('yt-api-timeout')), 8000);
+        setTimeout(() => reject(new Error('yt-api-timeout')), 9000);
       });
     }
     function createYouTubeBackend() {
       return new Promise((resolve, reject) => {
-        let resolved = false, fellBack = false, everPlaying = false, errStreak = 0;
-        const giveUp = () => {
+        let resolved = false, fellBack = false, everPlaying = false, cued = false, errStreak = 0;
+        const PS = () => (window.YT && YT.PlayerState) || {};
+        const giveUp = (why) => {
           if (fellBack) return; fellBack = true;
+          ytlog('YouTube unavailable → falling back to local music/. Reason:', why || '(unknown)');
           try { yt.destroy(); } catch (_) {}
-          if (!resolved) { resolved = true; reject(new Error('yt-unplayable')); }
+          if (!resolved) { resolved = true; reject(new Error('yt:' + (why || 'unavailable'))); }
           else startLocalFallback();   // YT backend was already live → swap to local
         };
         const yt = new YT.Player('yt-player', {
           width: 200, height: 120,
-          playerVars: {
-            autoplay: 0, controls: 0, disablekb: 1, fs: 0,
-            iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0,
-            listType: 'playlist', list: YT_UPLOADS,
-          },
+          playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0 },
           events: {
             onReady: (e) => {
-              const P = (window.YT && YT.PlayerState) || {};
-              try { e.target.setShuffle(true); } catch (_) {}
-              try { e.target.setLoop(true); } catch (_) {}
-              try { e.target.setPlaybackQuality('small'); } catch (_) {}
               try { e.target.setVolume(100); } catch (_) {}
-              const isPlaying = () => { const s = e.target.getPlayerState(); return s === P.PLAYING || s === P.BUFFERING; };
-              let userTriggered = false;
-              const startRandom = () => {
-                markStarted(); userTriggered = true;
-                try { e.target.setShuffle(true); } catch (_) {}
-                try {
-                  const pl = e.target.getPlaylist();
-                  if (pl && pl.length) e.target.playVideoAt((Math.random() * pl.length) | 0);
-                  else e.target.nextVideo();
-                } catch (_) { try { e.target.playVideo(); } catch (_) {} }
-                // If nothing is actually playing a few seconds later, YouTube isn't viable → fall back.
-                setTimeout(() => { if (!everPlaying) giveUp(); }, 5000);
-              };
-              resolved = true;
-              resolve({
-                isPlaying,
-                toggle: () => {
-                  if (isPlaying()) { try { e.target.pauseVideo(); } catch (_) {} }
-                  else if (!userTriggered) startRandom();
-                  else { markStarted(); try { e.target.playVideo(); } catch (_) {} }
-                },
-                next: startRandom,
-                prev: () => { markStarted(); userTriggered = true; try { e.target.previousVideo(); } catch (_) { startRandom(); } },
-                autostart: () => { if (!userTriggered) startRandom(); },
-              });
+              try { e.target.cuePlaylist({ listType: 'playlist', list: YT_UPLOADS }); }
+              catch (err) { giveUp('cuePlaylist threw: ' + err); return; }
+              setTimeout(() => { if (!cued && !resolved) giveUp('playlist never reached the CUED state within 12s'); }, 12000);
             },
             onStateChange: (e) => {
-              const P = (window.YT && YT.PlayerState) || {};
-              if (e.data === P.PLAYING) { everPlaying = true; errStreak = 0; }
+              const P = PS();
+              if (e.data === P.PLAYING && !everPlaying) {
+                everPlaying = true; errStreak = 0;
+                let t = ''; try { t = (e.target.getVideoData && e.target.getVideoData().title) || ''; } catch (_) {}
+                ytlog('▶ YouTube playing —', t || '(title unavailable)');
+              } else if (e.data === P.PLAYING) { errStreak = 0; }
               if (e.data === P.ENDED) { try { e.target.nextVideo(); } catch (_) {} }   // belt-and-braces if shuffle+loop didn't auto-advance
+
+              if (e.data === P.CUED && !cued) {
+                cued = true;
+                try { e.target.setShuffle(true); } catch (_) {}
+                try { e.target.setLoop(true); } catch (_) {}
+                try { e.target.setPlaybackQuality('small'); } catch (_) {}
+                let pl = []; try { pl = e.target.getPlaylist() || []; } catch (_) {}
+                ytlog('playlist cued —', pl.length, 'video(s).');
+                if (!pl.length) { giveUp('uploads playlist is empty / not loadable'); return; }
+                const isPlaying = () => { const s = e.target.getPlayerState(); return s === P.PLAYING || s === P.BUFFERING; };
+                let userTriggered = false;
+                const startRandom = () => {
+                  markStarted(); userTriggered = true;
+                  let list = []; try { list = e.target.getPlaylist() || []; } catch (_) {}
+                  try { if (list.length) e.target.playVideoAt((Math.random() * list.length) | 0); else e.target.playVideo(); }
+                  catch (_) { try { e.target.playVideo(); } catch (_) {} }
+                  setTimeout(() => { if (!everPlaying && !fellBack) giveUp('nothing actually playing 10s after the first play attempt'); }, 10000);
+                };
+                resolved = true;
+                resolve({
+                  isPlaying,
+                  toggle: () => {
+                    if (isPlaying()) { try { e.target.pauseVideo(); } catch (_) {} }
+                    else if (!userTriggered) startRandom();
+                    else { markStarted(); try { e.target.playVideo(); } catch (_) {} }
+                  },
+                  next: startRandom,
+                  prev: () => { markStarted(); userTriggered = true; try { e.target.previousVideo(); } catch (_) { startRandom(); } },
+                  autostart: () => { if (!userTriggered) startRandom(); },
+                });
+              }
               syncToggle();
             },
-            onError: () => {
-              if (everPlaying) { try { yt.nextVideo(); } catch (_) {} return; }   // a single dud video → skip it
-              if (++errStreak >= 4) giveUp();                                     // nothing has ever played → YouTube path is dead
-              else { try { yt.nextVideo(); } catch (_) {} }
+            onError: (e) => {
+              ytlog('player error, code', e.data, '(2=bad param, 5=html5, 100=removed/private, 101/150=embedding disabled)');
+              if (e.data === 2) { giveUp('invalid playlist parameter (error 2)'); return; }   // retrying won't help
+              if (everPlaying) { try { e.target.nextVideo(); } catch (_) {} return; }            // a single dud video → skip it
+              if (++errStreak >= 4) giveUp('repeated playback errors before anything played (last code ' + e.data + ')');
+              else { try { e.target.nextVideo(); } catch (_) {} }
             },
           },
         });
-        setTimeout(() => { if (!resolved) reject(new Error('yt-ready-timeout')); }, 8000);
+        setTimeout(() => { if (!resolved) giveUp('player never became ready within 12s'); }, 12000);
       });
     }
 
@@ -713,7 +728,9 @@
         await loadYouTubeAPI();
         const backend = await createYouTubeBackend();
         activatePlayer(backend, true);   // a channel playlist always has prev/next
-      } catch (_) {
+        ytlog('YouTube backend ready — press play (or click anywhere) to start.');
+      } catch (err) {
+        ytlog('YouTube path failed (', String(err && err.message || err), ') — using local music/.');
         await startLocalFallback();
       }
     }
