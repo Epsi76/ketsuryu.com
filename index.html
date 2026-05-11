@@ -563,9 +563,9 @@
         }
 
         void main() {
-          // Very dark vertical gradient: near-black at depth, faintly blueish near the surface
+          // Very dark vertical gradient; horizon stays nearly as dark as the depth
           vec3 deep    = vec3(0.0015, 0.0035, 0.0100);
-          vec3 shallow = vec3(0.0060, 0.0110, 0.0280);
+          vec3 shallow = vec3(0.0030, 0.0058, 0.0150);
           vec3 col = mix(deep, shallow, pow(vUv.y, 0.7));
 
           // Multi-scale ripple shimmer (slow, layered noise) — kept very subtle
@@ -576,28 +576,42 @@
           float shimmer = w1 * 0.5 + w2 * 0.3 + w3 * 0.2;
           col += vec3(0.010, 0.016, 0.032) * shimmer;
 
-          // Moonpath: bright wavering stripe under the moon
-          float wave = sin(vWorld.y * 1.4 + uTime * 0.6) * 0.55
-                     + sin(vWorld.y * 3.8 + uTime * 1.1) * 0.22;
-          float dx = abs((vWorld.x - uMoonX) + wave);
-          float stripeWidth = 1.0 + (1.0 - vUv.y) * 5.5;        // wider further from surface
-          float stripe = smoothstep(stripeWidth, 0.0, dx);
-          stripe *= mix(0.15, 1.0, pow(vUv.y, 1.4));            // brighter near surface
-          float breakup = 0.45 + 0.55 * sin(vWorld.y * 2.4 + uTime * 0.95 + shimmer * 6.0);
-          stripe *= breakup;
-          col += vec3(1.0, 0.93, 0.78) * stripe * 0.65;
+          // Moonpath: organic wavering ribbon under the moon
+          // 4-octave horizontal sine wave + noise distortion → non-periodic ripple
+          float wave = sin(vWorld.y * 0.85 + uTime * 0.50)        * 0.65
+                     + sin(vWorld.y * 2.00 + uTime * 0.85 + 1.7)  * 0.40
+                     + sin(vWorld.y * 4.30 + uTime * 1.30 + 0.9)  * 0.20
+                     + sin(vWorld.y * 8.50 + uTime * 1.90 + 2.4)  * 0.08;
+          wave += (vnoise(vec2(vWorld.x * 0.25, vWorld.y * 0.40 + uTime * 0.15)) - 0.5) * 0.75;
 
-          // Star reflections: two layers of very tight, high-frequency pinprick sparkles
-          vec2 sp1 = vec2(vWorld.x * 2.4 + uTime * 0.03, vWorld.y * 5.5);
-          vec2 sp2 = vec2(vWorld.x * 4.2 - uTime * 0.02, vWorld.y * 9.0 + sin(uTime * 0.5) * 0.3);
-          float spark = pow(vnoise(sp1), 56.0) * 1.0
-                      + pow(vnoise(sp2), 80.0) * 1.6;
+          float dx = abs((vWorld.x - uMoonX) + wave);
+
+          // Variable stripe width modulated by slow noise → ribbon expands and pinches
+          float widthMod = 0.70 + vnoise(vec2(vWorld.y * 0.45 + uTime * 0.20, 0.0)) * 0.65;
+          float stripeWidth = (0.85 + (1.0 - vUv.y) * 5.2) * widthMod;
+          float stripe = smoothstep(stripeWidth, 0.0, dx);
+          stripe *= mix(0.18, 1.0, pow(vUv.y, 1.3));
+
+          // Wave-coupled vertical break-up so the ribbon fragments along the same rhythm
+          float breakup = 0.40 + 0.60 * sin(vWorld.y * 2.4 + uTime * 0.95 + wave * 3.0);
+          stripe *= breakup;
+
+          // Bright wavelet glints scattered along (and confined to) the ribbon
+          float glimN = vnoise(vec2(vWorld.x * 1.5 + uTime * 0.22, vWorld.y * 4.5 - uTime * 0.40));
+          float glim  = pow(glimN, 38.0) * smoothstep(stripeWidth * 1.1, 0.0, dx) * 2.4;
+
+          col += vec3(1.00, 0.93, 0.78) * stripe * 0.65;
+          col += vec3(1.00, 0.96, 0.85) * glim;
+
+          // Star reflections: very sparse pinprick sparkles
+          vec2 sp = vec2(vWorld.x * 1.2 + uTime * 0.025, vWorld.y * 2.6);
+          float spark = pow(vnoise(sp), 90.0) * 2.6;
           spark *= smoothstep(0.0, 0.85, vUv.y);
           col += vec3(0.86, 0.92, 1.0) * spark;
 
-          // Subtle horizon-line glow right at the top edge
-          float surface = smoothstep(0.92, 1.0, vUv.y);
-          col += vec3(0.030, 0.045, 0.075) * surface;
+          // Very faint horizon-line glow right at the top edge
+          float surface = smoothstep(0.94, 1.0, vUv.y);
+          col += vec3(0.012, 0.018, 0.030) * surface;
 
           gl_FragColor = vec4(col, 1.0);
         }
