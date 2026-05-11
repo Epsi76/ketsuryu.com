@@ -806,7 +806,7 @@
     const wait  = (ms) => new Promise(r => setTimeout(r, ms));
 
     async function quoteLoop() {
-      await wait(2000);
+      await wait(7000);
       while (true) {
         const q = pickQuote();
         quoteText.textContent = '« ' + q.t + ' »';
