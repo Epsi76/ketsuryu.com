@@ -64,6 +64,7 @@
       cursor: pointer;
       opacity: 0.45;
       transition: opacity 0.25s ease, background 0.2s ease, color 0.2s ease;
+      animation: ui-fade-in 3s ease backwards;
       z-index: 10;
     }
     #fs-btn:hover, #fs-btn:focus-visible {
@@ -83,6 +84,7 @@
       gap: 6px;
       opacity: 0.45;
       transition: opacity 0.25s ease;
+      animation: ui-fade-in 3s ease backwards;
       z-index: 10;
     }
     #audio-ctrl:hover, #audio-ctrl:focus-within { opacity: 1; }
@@ -116,7 +118,11 @@
       70%  { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
       100% { box-shadow: 0 0 0 0   rgba(255, 255, 255, 0); }
     }
+    @keyframes ui-fade-in { from { opacity: 0; } }
+    /* Single-track playlist: no point in prev/next */
+    #audio-ctrl.solo #au-prev, #audio-ctrl.solo #au-next { display: none; }
     @media (prefers-reduced-motion: reduce) {
+      #fs-btn, #audio-ctrl { animation: none; }
       #audio-ctrl.hint #au-toggle { animation: none; }
     }
     body.is-fs #audio-ctrl {
@@ -603,6 +609,7 @@
       playlist = await discoverPlaylist();
       if (!playlist.length) { audioCtrl.style.display = 'none'; return; }
       bgAudio.loop = playlist.length === 1;   // single track → seamless native loop
+      audioCtrl.classList.toggle('solo', playlist.length === 1);  // hide prev/next
       playIndex(0, false);   // load the first track; playback starts on first gesture
       syncToggle();
       if (!audioStarted) audioCtrl.classList.add('hint');
