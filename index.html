@@ -220,7 +220,7 @@
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6.3 L14.6 12 L4 17.7 Z"/><rect x="16.2" y="6" width="2.4" height="12" rx="0.6"/></svg>
     </button>
   </div>
-  <audio id="bg-audio" preload="auto"></audio>
+  <audio id="bg-audio" preload="none"></audio>
 
   <script type="importmap">
   {
@@ -610,16 +610,24 @@
     }, { passive: true });
     addEventListener('pointerleave', () => audioCtrl.classList.remove('reveal'));
 
-    (async () => {
+    async function initAudio() {
       playlist = await discoverPlaylist();
       if (!playlist.length) { audioCtrl.style.display = 'none'; return; }
       bgAudio.loop = playlist.length === 1;   // single track → seamless native loop
       if (playlist.length > 1) audioCtrl.classList.add('multi');  // show prev/next
-      playIndex(0, false);   // load the first track; playback starts on first gesture
+      playIndex(0, false);   // point at the first track; nothing downloads yet (preload=none)
+      bgAudio.preload = 'auto';   // page is fully loaded → safe to pre-buffer it now
       syncToggle();
       if (!audioStarted) audioCtrl.classList.add('hint');
       audioCtrl.classList.add('ready');   // reveal + fade in, now with the final layout
-    })();
+    }
+    // Defer everything music-related until the rest of the page has loaded, so
+    // playlist discovery / mp3 buffering never competes with the bg video,
+    // petal textures or Three.js. (setTimeout = backstop if `load` is delayed.)
+    let audioInitStarted = false;
+    const startAudioInit = () => { if (!audioInitStarted) { audioInitStarted = true; initAudio(); } };
+    if (document.readyState === 'complete') startAudioInit();
+    else { addEventListener('load', startAudioInit, { once: true }); setTimeout(startAudioInit, 6000); }
 
     // ---------- Random Asian wisdom quotes (fade-in + un-blur, hold, fade-out, gap, loop) ----------
     const QUOTES = [
