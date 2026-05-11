@@ -141,17 +141,6 @@
     body.is-fs #audio-ctrl.reveal:hover {
       opacity: 1;
     }
-    /* Hidden YouTube player (we only want its audio) — kept off-screen but still
-       rendered (not display:none / visibility:hidden) so the browser will play it. */
-    #yt-player {
-      position: fixed;
-      left: -9999px;
-      bottom: 0;
-      width: 200px;
-      height: 120px;
-      border: 0;
-      pointer-events: none;
-    }
 
     #quote {
       position: fixed;
@@ -232,7 +221,6 @@
     </button>
   </div>
   <audio id="bg-audio" preload="none"></audio>
-  <div id="yt-player" aria-hidden="true"></div>
 
   <script type="importmap">
   {
@@ -525,7 +513,7 @@
     }, { passive: true });
     addEventListener('pointerleave', () => fsBtn.classList.remove('reveal'));
 
-    // ---------- Background music: hidden YouTube channel player, local music/ fallback ----------
+    // ---------- Background music: auto-discovered playlist, minimal controls ----------
     const bgAudio   = document.getElementById('bg-audio');
     const audioCtrl = document.getElementById('audio-ctrl');
     const auToggle  = document.getElementById('au-toggle');
@@ -533,126 +521,17 @@
     const auNext    = document.getElementById('au-next');
     const ICON_PLAY  = '<path d="M7 5 L20 12 L7 19 Z"/>';
     const ICON_PAUSE = '<rect x="6.5" y="5" width="4" height="14" rx="0.8"/><rect x="13.5" y="5" width="4" height="14" rx="0.8"/>';
-    // @yugen_ambient — the channel's auto-generated "uploads" playlist (UU + channelId without the leading UC)
-    const YT_UPLOADS = 'UUaptN0fxyT89GYPL0xCYsKw';
 
-    let player = null;          // active backend: { isPlaying, toggle, next, prev, autostart }
+    let playlist = [];      // playlist[0] always plays first; the rest shuffle
+    let curIdx = -1;
+    const history = [];     // previously played indices, for the ⏮ button
     let audioStarted = false;
     function markStarted() { audioStarted = true; audioCtrl.classList.remove('hint'); }
-    function syncToggle() {
-      const playing = !!player && player.isPlaying();
-      auToggle.querySelector('svg').innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
-      auToggle.setAttribute('aria-label', playing ? 'Pause' : 'Lecture');
-    }
 
-    // Controls just forward to whichever backend is live.
-    auToggle.addEventListener('click', (e) => { e.stopPropagation(); if (player) player.toggle(); });
-    auPrev.addEventListener('click',   (e) => { e.stopPropagation(); if (player) player.prev(); });
-    auNext.addEventListener('click',   (e) => { e.stopPropagation(); if (player) player.next(); });
-    // Near-automatic: kick playback off on the first interaction anywhere
-    // (browsers block media playback with sound until a user gesture — true for YouTube too).
-    addEventListener('pointerdown', (e) => {
-      if (audioStarted || !player || e.target.closest('#audio-ctrl')) return;
-      player.autostart();
-    });
-
-    // Reveal the audio controls only in the bottom-left 30% zone (fullscreen only)
-    addEventListener('pointermove', (e) => {
-      if (!document.body.classList.contains('is-fs')) return;
-      const inZone = e.clientX < innerWidth * 0.3 && e.clientY > innerHeight * 0.7;
-      audioCtrl.classList.toggle('reveal', inZone);
-    }, { passive: true });
-    addEventListener('pointerleave', () => audioCtrl.classList.remove('reveal'));
-
-    function activatePlayer(backend, hasMulti) {
-      player = backend;
-      audioCtrl.classList.toggle('multi', !!hasMulti);   // show/hide prev+next
-      syncToggle();
-      if (!audioStarted) audioCtrl.classList.add('hint'); // gentle pulse until first gesture
-      audioCtrl.classList.add('ready');                   // reveal + fade in, with the final layout
-    }
-
-    // ----- YouTube backend: hidden iframe playing the channel's uploads on shuffle + loop -----
-    function loadYouTubeAPI() {
-      return new Promise((resolve, reject) => {
-        if (window.YT && window.YT.Player) { resolve(); return; }
-        const prev = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') { try { prev(); } catch (_) {} } resolve(); };
-        const s = document.createElement('script');
-        s.src = 'https://www.youtube.com/iframe_api';
-        s.onerror = () => reject(new Error('yt-api-load-failed'));
-        document.head.appendChild(s);
-        setTimeout(() => reject(new Error('yt-api-timeout')), 8000);
-      });
-    }
-    function createYouTubeBackend() {
-      return new Promise((resolve, reject) => {
-        let resolved = false, fellBack = false, everPlaying = false, errStreak = 0;
-        const giveUp = () => {
-          if (fellBack) return; fellBack = true;
-          try { yt.destroy(); } catch (_) {}
-          if (!resolved) { resolved = true; reject(new Error('yt-unplayable')); }
-          else startLocalFallback();   // YT backend was already live → swap to local
-        };
-        const yt = new YT.Player('yt-player', {
-          width: 200, height: 120,
-          playerVars: {
-            autoplay: 0, controls: 0, disablekb: 1, fs: 0,
-            iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0,
-            listType: 'playlist', list: YT_UPLOADS,
-          },
-          events: {
-            onReady: (e) => {
-              const P = (window.YT && YT.PlayerState) || {};
-              try { e.target.setShuffle(true); } catch (_) {}
-              try { e.target.setLoop(true); } catch (_) {}
-              try { e.target.setPlaybackQuality('small'); } catch (_) {}
-              try { e.target.setVolume(100); } catch (_) {}
-              const isPlaying = () => { const s = e.target.getPlayerState(); return s === P.PLAYING || s === P.BUFFERING; };
-              let userTriggered = false;
-              const startRandom = () => {
-                markStarted(); userTriggered = true;
-                try { e.target.setShuffle(true); } catch (_) {}
-                try {
-                  const pl = e.target.getPlaylist();
-                  if (pl && pl.length) e.target.playVideoAt((Math.random() * pl.length) | 0);
-                  else e.target.nextVideo();
-                } catch (_) { try { e.target.playVideo(); } catch (_) {} }
-                // If nothing is actually playing a few seconds later, YouTube isn't viable → fall back.
-                setTimeout(() => { if (!everPlaying) giveUp(); }, 5000);
-              };
-              resolved = true;
-              resolve({
-                isPlaying,
-                toggle: () => {
-                  if (isPlaying()) { try { e.target.pauseVideo(); } catch (_) {} }
-                  else if (!userTriggered) startRandom();
-                  else { markStarted(); try { e.target.playVideo(); } catch (_) {} }
-                },
-                next: startRandom,
-                prev: () => { markStarted(); userTriggered = true; try { e.target.previousVideo(); } catch (_) { startRandom(); } },
-                autostart: () => { if (!userTriggered) startRandom(); },
-              });
-            },
-            onStateChange: (e) => {
-              const P = (window.YT && YT.PlayerState) || {};
-              if (e.data === P.PLAYING) { everPlaying = true; errStreak = 0; }
-              if (e.data === P.ENDED) { try { e.target.nextVideo(); } catch (_) {} }   // belt-and-braces if shuffle+loop didn't auto-advance
-              syncToggle();
-            },
-            onError: () => {
-              if (everPlaying) { try { yt.nextVideo(); } catch (_) {} return; }   // a single dud video → skip it
-              if (++errStreak >= 4) giveUp();                                     // nothing has ever played → YouTube path is dead
-              else { try { yt.nextVideo(); } catch (_) {} }
-            },
-          },
-        });
-        setTimeout(() => { if (!resolved) reject(new Error('yt-ready-timeout')); }, 8000);
-      });
-    }
-
-    // ----- Local backend: the music/ folder, discovered at runtime (fallback only) -----
-    async function discoverLocalPlaylist() {
+    // Discover the .mp3 files in music/ — first via a directory listing
+    // (autoindex / `python -m http.server`), then by probing music/1.mp3,
+    // music/2.mp3, … so it also works on hosts without directory listing.
+    async function discoverPlaylist() {
       try {
         const res = await fetch('music/', { cache: 'no-store' });
         if (res.ok) {
@@ -669,56 +548,81 @@
       const found = [];
       for (let i = 1; i <= 50; i++) {
         const url = `music/${i}.mp3`;
-        try { const r = await fetch(url, { method: 'HEAD', cache: 'no-store' }); if (!r.ok) break; found.push(url); }
-        catch (_) { break; }
+        try {
+          const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+          if (!r.ok) break;
+          found.push(url);
+        } catch (_) { break; }
       }
       return found;
     }
-    function makeLocalBackend(list) {
-      let curIdx = -1; const history = [];
-      bgAudio.loop = list.length === 1;   // single track → seamless native loop
-      const rnd = () => { if (list.length <= 1) return 0; let i; do { i = (Math.random() * list.length) | 0; } while (i === curIdx); return i; };
-      const playIdx = (i, autoplay) => {
-        curIdx = ((i % list.length) + list.length) % list.length;
-        bgAudio.src = list[curIdx];
-        if (autoplay) { markStarted(); bgAudio.play().catch(() => {}); }
-      };
-      const next = (autoplay) => { if (curIdx >= 0) { history.push(curIdx); if (history.length > 100) history.shift(); } playIdx(rnd(), autoplay); };
-      const prev = (autoplay) => playIdx(history.length ? history.pop() : rnd(), autoplay);
-      bgAudio.addEventListener('play',  syncToggle);
-      bgAudio.addEventListener('pause', syncToggle);
-      bgAudio.addEventListener('ended', () => { if (!bgAudio.loop) next(true); });
-      playIdx(0, false);          // point at the first track; nothing downloads yet (preload=none)
-      bgAudio.preload = 'auto';   // page is fully loaded → safe to pre-buffer now
-      return {
-        isPlaying: () => !bgAudio.paused && !bgAudio.ended,
-        toggle: () => { markStarted(); if (bgAudio.paused) bgAudio.play().catch(() => {}); else bgAudio.pause(); },
-        next: () => next(true),
-        prev: () => prev(true),
-        autostart: () => { markStarted(); bgAudio.play().catch(() => {}); },
-      };
+
+    function syncToggle() {
+      const playing = !bgAudio.paused && !bgAudio.ended;
+      auToggle.querySelector('svg').innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+      auToggle.setAttribute('aria-label', playing ? 'Pause' : 'Lecture');
     }
-    let localFallbackStarted = false;
-    async function startLocalFallback() {
-      if (localFallbackStarted) return; localFallbackStarted = true;
-      audioCtrl.classList.remove('ready', 'multi');   // reset before re-activating with the local layout
-      const list = await discoverLocalPlaylist();
-      if (!list.length) { player = null; audioCtrl.style.display = 'none'; return; }
-      activatePlayer(makeLocalBackend(list), list.length > 1);
+    function playIndex(i, autoplay) {
+      if (!playlist.length) return;
+      curIdx = ((i % playlist.length) + playlist.length) % playlist.length;
+      bgAudio.src = playlist[curIdx];
+      if (autoplay) { markStarted(); bgAudio.play().catch(() => {}); }
+    }
+    function randomIndex() {
+      if (playlist.length <= 1) return 0;
+      let i; do { i = (Math.random() * playlist.length) | 0; } while (i === curIdx);
+      return i;
+    }
+    function nextTrack(autoplay) {
+      if (curIdx >= 0) { history.push(curIdx); if (history.length > 100) history.shift(); }
+      playIndex(randomIndex(), autoplay);
+    }
+    function prevTrack(autoplay) {
+      playIndex(history.length ? history.pop() : randomIndex(), autoplay);
     }
 
-    // ----- Init: try YouTube first, fall back to local music/ on any failure -----
+    bgAudio.addEventListener('play',  syncToggle);
+    bgAudio.addEventListener('pause', syncToggle);
+    bgAudio.addEventListener('ended', () => nextTrack(true));
+
+    auToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!playlist.length) return;
+      markStarted();
+      if (bgAudio.paused) bgAudio.play().catch(() => {}); else bgAudio.pause();
+    });
+    auPrev.addEventListener('click', (e) => { e.stopPropagation(); prevTrack(true); });
+    auNext.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(true); });
+
+    // Near-automatic: kick playback off on the first interaction anywhere
+    // (browsers block audio autoplay until a user gesture).
+    addEventListener('pointerdown', (e) => {
+      if (audioStarted || !playlist.length || e.target.closest('#audio-ctrl')) return;
+      markStarted();
+      bgAudio.play().catch(() => {});
+    });
+
+    // Reveal the audio controls only in the bottom-left 30% zone (fullscreen only)
+    addEventListener('pointermove', (e) => {
+      if (!document.body.classList.contains('is-fs')) return;
+      const inZone = e.clientX < innerWidth * 0.3 && e.clientY > innerHeight * 0.7;
+      audioCtrl.classList.toggle('reveal', inZone);
+    }, { passive: true });
+    addEventListener('pointerleave', () => audioCtrl.classList.remove('reveal'));
+
     async function initAudio() {
-      try {
-        await loadYouTubeAPI();
-        const backend = await createYouTubeBackend();
-        activatePlayer(backend, true);   // a channel playlist always has prev/next
-      } catch (_) {
-        await startLocalFallback();
-      }
+      playlist = await discoverPlaylist();
+      if (!playlist.length) { audioCtrl.style.display = 'none'; return; }
+      bgAudio.loop = playlist.length === 1;   // single track → seamless native loop
+      if (playlist.length > 1) audioCtrl.classList.add('multi');  // show prev/next
+      playIndex(0, false);   // point at the first track; nothing downloads yet (preload=none)
+      bgAudio.preload = 'auto';   // page is fully loaded → safe to pre-buffer it now
+      syncToggle();
+      if (!audioStarted) audioCtrl.classList.add('hint');
+      audioCtrl.classList.add('ready');   // reveal + fade in, now with the final layout
     }
-    // Defer everything music-related until the rest of the page has loaded, so the
-    // YouTube API + iframe (or mp3 buffering) never competes with the bg video,
+    // Defer everything music-related until the rest of the page has loaded, so
+    // playlist discovery / mp3 buffering never competes with the bg video,
     // petal textures or Three.js. (setTimeout = backstop if `load` is delayed.)
     let audioInitStarted = false;
     const startAudioInit = () => { if (!audioInitStarted) { audioInitStarted = true; initAudio(); } };
