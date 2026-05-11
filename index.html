@@ -314,10 +314,10 @@
       const ctx = c.getContext('2d');
       const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
       grad.addColorStop(0.00, 'rgba(255, 250, 232, 1.00)');
-      grad.addColorStop(0.16, 'rgba(255, 246, 222, 0.95)');
-      grad.addColorStop(0.26, 'rgba(255, 234, 202, 0.55)');
-      grad.addColorStop(0.45, 'rgba(255, 222, 198, 0.20)');
-      grad.addColorStop(0.70, 'rgba(255, 220, 195, 0.07)');
+      grad.addColorStop(0.20, 'rgba(255, 246, 222, 0.95)');
+      grad.addColorStop(0.26, 'rgba(255, 236, 208, 0.32)');
+      grad.addColorStop(0.40, 'rgba(255, 226, 200, 0.08)');
+      grad.addColorStop(0.65, 'rgba(255, 220, 195, 0.00)');
       grad.addColorStop(1.00, 'rgba(255, 220, 195, 0.00)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, size, size);
@@ -332,7 +332,7 @@
       blending: THREE.AdditiveBlending,
     });
     const moon = new THREE.Sprite(moonMat);
-    moon.position.set(16, 14, -52);
+    moon.position.set(22, 19, -52);
     moon.scale.set(13, 13, 1);
     sky.add(moon);
 
