@@ -1,37 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0"    stop-color="#191338"/>
-      <stop offset="0.40" stop-color="#412a5c"/>
-      <stop offset="0.66" stop-color="#8c4a62"/>
-      <stop offset="0.84" stop-color="#cb7a59"/>
-      <stop offset="1"    stop-color="#341f3a"/>
-    </linearGradient>
-    <radialGradient id="fog" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0"   stop-color="#f4cda2" stop-opacity="0.42"/>
-      <stop offset="0.6" stop-color="#e9b58c" stop-opacity="0.16"/>
-      <stop offset="1"   stop-color="#e9b58c" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="moonglow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0"    stop-color="#fdf6e3" stop-opacity="0.55"/>
-      <stop offset="0.32" stop-color="#fbe9c8" stop-opacity="0.22"/>
-      <stop offset="1"    stop-color="#fbe9c8" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="moon" cx="0.4" cy="0.38" r="0.65">
-      <stop offset="0"    stop-color="#fdfaf0"/>
-      <stop offset="0.7"  stop-color="#efe5cd"/>
-      <stop offset="1"    stop-color="#d6c8ab"/>
-    </radialGradient>
-    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0"   stop-color="#120c20" stop-opacity="0"/>
-      <stop offset="0.6" stop-color="#120c20" stop-opacity="0.32"/>
-      <stop offset="1"   stop-color="#0c0818" stop-opacity="0.66"/>
-    </linearGradient>
-    <radialGradient id="vig" cx="0.5" cy="0.42" r="0.78">
-      <stop offset="0"   stop-color="#000" stop-opacity="0"/>
-      <stop offset="0.68" stop-color="#000" stop-opacity="0"/>
-      <stop offset="1"   stop-color="#000" stop-opacity="0.5"/>
-    </radialGradient>
     <linearGradient id="petalg" x1="0" y1="0" x2="0.7" y2="1">
       <stop offset="0"   stop-color="#ffe8f2"/>
       <stop offset="0.5" stop-color="#f7afcc"/>
@@ -40,52 +8,43 @@
     <path id="petal" d="M0 22C10 19 18 -2 15 -15 13 -20 7 -22 0 -22 -7 -22 -13 -20 -15 -15 -18 -2 -10 19 0 22Z"/>
     <filter id="b1" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="3"/></filter>
     <filter id="b2" x="-160%" y="-160%" width="420%" height="420%"><feGaussianBlur stdDeviation="6"/></filter>
-    <filter id="txtshadow" x="-30%" y="-30%" width="160%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.55"/></filter>
+    <filter id="txtshadow" x="-30%" y="-30%" width="160%" height="220%"><feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity="0.7"/></filter>
+    <linearGradient id="botscrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.42"/>
+    </linearGradient>
   </defs>
 
-  <rect width="1200" height="630" fill="url(#sky)"/>
+  <image href="og-bg.jpg" x="0" y="0" width="1200" height="630"/>
 
-  <!-- horizon fog -->
-  <ellipse cx="600" cy="420" rx="900" ry="180" fill="url(#fog)"/>
-
-  <!-- far petals (small, blurred, faint) -->
+  <!-- distant petals: small, blurred -->
   <g fill="url(#petalg)">
-    <use href="#petal" transform="translate(150 96) rotate(38) scale(0.5)"  opacity="0.40" filter="url(#b2)"/>
-    <use href="#petal" transform="translate(404 58) rotate(-24) scale(0.42)" opacity="0.34" filter="url(#b2)"/>
-    <use href="#petal" transform="translate(690 120) rotate(63) scale(0.55)" opacity="0.40" filter="url(#b2)"/>
-    <use href="#petal" transform="translate(1018 72) rotate(14) scale(0.46)" opacity="0.34" filter="url(#b2)"/>
-    <use href="#petal" transform="translate(540 214) rotate(-44) scale(0.62)" opacity="0.46" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(266 252) rotate(27) scale(0.6)"  opacity="0.42" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(862 240) rotate(-12) scale(0.5)" opacity="0.38" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(180 68) rotate(38) scale(0.5)"   opacity="0.6"  filter="url(#b2)"/>
+    <use href="#petal" transform="translate(470 38) rotate(-24) scale(0.42)" opacity="0.55" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(1015 84) rotate(14) scale(0.46)" opacity="0.55" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(330 196) rotate(60) scale(0.56)" opacity="0.65" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(640 150) rotate(-40) scale(0.5)" opacity="0.6"  filter="url(#b1)"/>
   </g>
 
-  <!-- moon, upper-right -->
-  <circle cx="932" cy="196" r="200" fill="url(#moonglow)"/>
-  <circle cx="932" cy="196" r="74"  fill="url(#moon)"/>
-
-  <!-- mid + foreground petals (sharp) -->
+  <!-- mid + foreground petals: sharp pink, drifting down -->
   <g fill="url(#petalg)">
-    <use href="#petal" transform="translate(120 384) rotate(42) scale(1.05)"  opacity="0.95"/>
-    <use href="#petal" transform="translate(322 470) rotate(-26) scale(1.32)" opacity="1"/>
-    <use href="#petal" transform="translate(508 322) rotate(72) scale(0.86)"  opacity="0.9" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(636 548) rotate(11) scale(1.5)"   opacity="1"/>
-    <use href="#petal" transform="translate(772 392) rotate(-56) scale(0.96)" opacity="0.96"/>
-    <use href="#petal" transform="translate(900 524) rotate(31) scale(1.22)"  opacity="1"/>
-    <use href="#petal" transform="translate(1064 432) rotate(-16) scale(1.06)" opacity="0.96"/>
-    <use href="#petal" transform="translate(1146 286) rotate(52) scale(0.78)" opacity="0.88" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(52 552) rotate(-34) scale(0.92)"  opacity="0.93"/>
-    <use href="#petal" transform="translate(430 606) rotate(19) scale(0.7)"   opacity="0.85" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(244 410) rotate(58) scale(0.62)"  opacity="0.78" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(1010 588) rotate(-48) scale(0.84)" opacity="0.9"/>
+    <use href="#petal" transform="translate(108 358) rotate(42) scale(1.0)"   opacity="0.97"/>
+    <use href="#petal" transform="translate(298 472) rotate(-26) scale(1.28)" opacity="1"/>
+    <use href="#petal" transform="translate(468 302) rotate(72) scale(0.8)"   opacity="0.92" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(560 562) rotate(11) scale(1.4)"   opacity="1"/>
+    <use href="#petal" transform="translate(706 384) rotate(-56) scale(0.92)" opacity="0.96"/>
+    <use href="#petal" transform="translate(910 248) rotate(31) scale(0.84)"  opacity="0.94"/>
+    <use href="#petal" transform="translate(1034 472) rotate(-16) scale(1.05)" opacity="0.96"/>
+    <use href="#petal" transform="translate(1152 318) rotate(52) scale(0.7)"  opacity="0.88" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(58 540) rotate(-34) scale(0.86)"  opacity="0.94"/>
+    <use href="#petal" transform="translate(402 602) rotate(19) scale(0.66)"  opacity="0.85" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(958 592) rotate(-48) scale(0.78)" opacity="0.9"/>
   </g>
 
-  <!-- bottom scrim + vignette -->
-  <rect x="0" y="300" width="1200" height="330" fill="url(#scrim)"/>
-  <rect width="1200" height="630" fill="url(#vig)"/>
-
-  <!-- wordmark -->
+  <!-- subtle bottom scrim for the wordmark -->
+  <rect x="0" y="382" width="1200" height="248" fill="url(#botscrim)"/>
   <g filter="url(#txtshadow)">
-    <text x="66" y="534" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="74" font-style="italic" fill="#fff4f8" letter-spacing="1">KetsuRyu</text>
-    <text x="70" y="576" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="22" fill="#ffd6e2" letter-spacing="4.5">DEEP-WORK · DÉTENTE · SAGESSES D'ASIE</text>
+    <text x="64" y="538" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="72" font-style="italic" fill="#fff4f8" letter-spacing="1">KetsuRyu</text>
+    <text x="68" y="578" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="21" fill="#ffd6e2" letter-spacing="4">DEEP-WORK · DÉTENTE · SAGESSES D'ASIE</text>
   </g>
 </svg>
