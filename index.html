@@ -12,6 +12,12 @@
       background: #000;
     }
     canvas { display: block; }
+    .petals-canvas {
+      opacity: 0;
+      transition: opacity 3s ease;
+      will-change: opacity;
+    }
+    .petals-canvas.loaded { opacity: 1; }
     #bg-video {
       position: fixed;
       top: -2vh;
@@ -167,11 +173,19 @@
       el.style.inset = '0';
       el.style.zIndex = String(zIndex);
       el.style.pointerEvents = 'none';
+      el.classList.add('petals-canvas');
       document.body.appendChild(el);
       return r;
     }
     const rendererBack  = makeRenderer(1);
     const rendererFront = makeRenderer(6);
+
+    // Fade petal canvases in (slower than UI, faster than the 5s bg-video).
+    // Double rAF so the initial opacity:0 paints before the transition.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      rendererBack.domElement.classList.add('loaded');
+      rendererFront.domElement.classList.add('loaded');
+    }));
 
     // ---------- Background video: fade-in + mouse-driven parallax ----------
     const bgVideo = document.getElementById('bg-video');
