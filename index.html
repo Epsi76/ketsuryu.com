@@ -443,13 +443,50 @@
       return tex;
     }
 
-    function makeMoonGlowTexture(stops) {
+    function makeMoonGlowTexture() {
+      const size = 512;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const cx = size / 2, cy = size / 2;
+      // Inner subtle wash (gives the disk a "lit-up" feel when added over it)
+      // + strong peak right around the moon's limb (~0.39 of glow radius)
+      // + wide soft outer halo fading into the sky.
+      // Very faint wash across the disk (just enough to feel "lit") so surface
+      // details remain readable; bright peak right at the limb; wide soft halo.
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+      grad.addColorStop(0.00, 'rgba(255, 252, 232, 0.03)');
+      grad.addColorStop(0.32, 'rgba(255, 252, 232, 0.04)');  // subtle wash over the disk
+      grad.addColorStop(0.36, 'rgba(255, 250, 226, 0.20)');  // ramp up just inside the limb
+      grad.addColorStop(0.40, 'rgba(255, 248, 222, 0.60)');  // bright limb peak
+      grad.addColorStop(0.46, 'rgba(255, 244, 215, 0.40)');
+      grad.addColorStop(0.58, 'rgba(255, 240, 212, 0.20)');
+      grad.addColorStop(0.72, 'rgba(255, 238, 208, 0.09)');
+      grad.addColorStop(0.88, 'rgba(255, 232, 200, 0.03)');
+      grad.addColorStop(1.00, 'rgba(255, 230, 198, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      return tex;
+    }
+
+    // Very wide, very faint outer aura — gives the impression the moon lights the sky
+    function makeMoonAuraTexture() {
       const size = 256;
       const c = document.createElement('canvas');
       c.width = c.height = size;
       const ctx = c.getContext('2d');
+      // Very low opacity over the moon disk (~21% of this sprite's radius
+      // covers the disk at scale 40), then a faint wide halo into the sky.
       const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-      for (const [t, color] of stops) grad.addColorStop(t, color);
+      grad.addColorStop(0.00, 'rgba(255, 244, 218, 0.025)');
+      grad.addColorStop(0.20, 'rgba(255, 244, 218, 0.030)');
+      grad.addColorStop(0.28, 'rgba(255, 240, 212, 0.050)');
+      grad.addColorStop(0.50, 'rgba(255, 238, 208, 0.030)');
+      grad.addColorStop(0.75, 'rgba(255, 235, 205, 0.012)');
+      grad.addColorStop(1.00, 'rgba(255, 235, 205, 0)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, size, size);
       const tex = new THREE.CanvasTexture(c);
@@ -459,45 +496,7 @@
 
     const MOON_POS = new THREE.Vector3(28, 19, -52);
 
-    // Wide soft bloom (outer-most): subtle aura that spreads far into the sky
-    const moonGlowOuter = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: makeMoonGlowTexture([
-        [0.00, 'rgba(255, 246, 220, 0)'],
-        [0.22, 'rgba(255, 246, 220, 0)'],
-        [0.30, 'rgba(255, 245, 215, 0.28)'],
-        [0.50, 'rgba(255, 240, 210, 0.12)'],
-        [0.80, 'rgba(255, 235, 200, 0.03)'],
-        [1.00, 'rgba(255, 235, 200, 0)'],
-      ]),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }));
-    moonGlowOuter.position.copy(MOON_POS).setZ(MOON_POS.z - 0.6);
-    moonGlowOuter.scale.set(28, 28, 1);
-    moonGlowOuter.renderOrder = 0;
-    sky.add(moonGlowOuter);
-
-    // Tight rim glow sitting right against the disk: makes the moon actually shine
-    const moonGlowInner = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: makeMoonGlowTexture([
-        [0.00, 'rgba(255, 250, 232, 0)'],
-        [0.55, 'rgba(255, 250, 232, 0)'],
-        [0.62, 'rgba(255, 246, 220, 0.70)'],
-        [0.74, 'rgba(255, 242, 215, 0.28)'],
-        [0.90, 'rgba(255, 238, 208, 0.08)'],
-        [1.00, 'rgba(255, 235, 200, 0)'],
-      ]),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }));
-    moonGlowInner.position.copy(MOON_POS).setZ(MOON_POS.z - 0.4);
-    moonGlowInner.scale.set(11.5, 11.5, 1);
-    moonGlowInner.renderOrder = 1;
-    sky.add(moonGlowInner);
-
-    // Moon disk itself (normal blending, drawn last so its surface is preserved)
+    // Render order (back → front): disk → halo (over the moon) → wide outer aura
     const moonDisk = new THREE.Sprite(new THREE.SpriteMaterial({
       map: makeMoonDiskTexture(),
       transparent: true,
@@ -505,8 +504,30 @@
     }));
     moonDisk.position.copy(MOON_POS);
     moonDisk.scale.set(8.5, 8.5, 1);
-    moonDisk.renderOrder = 2;
+    moonDisk.renderOrder = 1;
     sky.add(moonDisk);
+
+    const moonGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeMoonGlowTexture(),
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    moonGlow.position.copy(MOON_POS);
+    moonGlow.scale.set(17, 17, 1);
+    moonGlow.renderOrder = 2;
+    sky.add(moonGlow);
+
+    const moonAura = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeMoonAuraTexture(),
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    moonAura.position.copy(MOON_POS);
+    moonAura.scale.set(40, 40, 1);
+    moonAura.renderOrder = 3;
+    sky.add(moonAura);
 
     // Celestial drift: slow rotation around a slightly tilted axis (≈ Earth's polar view)
     const SKY_AXIS = new THREE.Vector3(0.18, 1.0, 0.05).normalize();
