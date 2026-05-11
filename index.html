@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>KetsuRyu</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="mask-icon" href="/favicon.svg" color="#ec7aa8" />
-  <link rel="apple-touch-icon" href="/icon-maskable.svg" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="mask-icon" href="/favicon.svg" color="#e6729d" />
   <link rel="manifest" href="/site.webmanifest" />
   <meta name="theme-color" content="#0b0b0d" />
   <style>
@@ -579,6 +580,7 @@
 
     // ----- YouTube backend: hidden iframe playing the channel's uploads on shuffle + loop -----
     const ytlog = (...a) => { try { console.warn('[ketsuryu music]', ...a); } catch (_) {} };
+    const mlog  = (...a) => { try { console.log('[ketsuryu music]', ...a); } catch (_) {} };
     function loadYouTubeAPI() {
       return new Promise((resolve, reject) => {
         if (window.YT && window.YT.Player) { resolve(); return; }
@@ -593,7 +595,7 @@
     }
     function createYouTubeBackend() {
       return new Promise((resolve, reject) => {
-        let resolved = false, fellBack = false, everPlaying = false, cued = false, errStreak = 0;
+        let resolved = false, fellBack = false, everPlaying = false, cued = false, errStreak = 0, lastVid = null;
         const PS = () => (window.YT && YT.PlayerState) || {};
         const giveUp = (why) => {
           if (fellBack) return; fellBack = true;
@@ -614,11 +616,18 @@
             },
             onStateChange: (e) => {
               const P = PS();
-              if (e.data === P.PLAYING && !everPlaying) {
+              if (e.data === P.PLAYING) {
                 everPlaying = true; errStreak = 0;
-                let t = ''; try { t = (e.target.getVideoData && e.target.getVideoData().title) || ''; } catch (_) {}
-                ytlog('▶ YouTube playing —', t || '(title unavailable)');
-              } else if (e.data === P.PLAYING) { errStreak = 0; }
+                let vid = '', title = '';
+                try { const d = e.target.getVideoData && e.target.getVideoData(); if (d) { vid = d.video_id || ''; title = d.title || ''; } } catch (_) {}
+                if (vid && vid !== lastVid) {                          // log each time a new video starts (first play, prev/next, auto-advance)
+                  lastVid = vid;
+                  let idx = -1, len = 0;
+                  try { idx = e.target.getPlaylistIndex(); } catch (_) {}
+                  try { len = (e.target.getPlaylist() || []).length; } catch (_) {}
+                  mlog('▶ YouTube —', title || '(title pending…)', '· https://youtu.be/' + vid + (idx >= 0 && len ? '  · #' + (idx + 1) + '/' + len : ''));
+                }
+              }
               if (e.data === P.ENDED) { try { e.target.nextVideo(); } catch (_) {} }   // belt-and-braces if shuffle+loop didn't auto-advance
 
               if (e.data === P.CUED && !cued) {
@@ -646,8 +655,8 @@
                     else if (!userTriggered) startRandom();
                     else { markStarted(); try { e.target.playVideo(); } catch (_) {} }
                   },
-                  next: startRandom,
-                  prev: () => { markStarted(); userTriggered = true; try { e.target.previousVideo(); } catch (_) { startRandom(); } },
+                  next: () => { mlog('⏭ next track…'); startRandom(); },
+                  prev: () => { mlog('⏮ previous track…'); markStarted(); userTriggered = true; try { e.target.previousVideo(); } catch (_) { startRandom(); } },
                   autostart: () => { if (!userTriggered) startRandom(); },
                 });
               }
@@ -700,7 +709,8 @@
       };
       const next = (autoplay) => { if (curIdx >= 0) { history.push(curIdx); if (history.length > 100) history.shift(); } playIdx(rnd(), autoplay); };
       const prev = (autoplay) => playIdx(history.length ? history.pop() : rnd(), autoplay);
-      bgAudio.addEventListener('play',  syncToggle);
+      const trackLabel = () => list[curIdx] + ' · #' + (curIdx + 1) + '/' + list.length;
+      bgAudio.addEventListener('play',  () => { mlog('▶ local —', trackLabel()); syncToggle(); });
       bgAudio.addEventListener('pause', syncToggle);
       bgAudio.addEventListener('ended', () => { if (!bgAudio.loop) next(true); });
       playIdx(0, false);          // point at the first track; nothing downloads yet (preload=none)
@@ -708,8 +718,8 @@
       return {
         isPlaying: () => !bgAudio.paused && !bgAudio.ended,
         toggle: () => { markStarted(); if (bgAudio.paused) bgAudio.play().catch(() => {}); else bgAudio.pause(); },
-        next: () => next(true),
-        prev: () => prev(true),
+        next: () => { mlog('⏭ next track…'); next(true); },
+        prev: () => { mlog('⏮ previous track…'); prev(true); },
         autostart: () => { markStarted(); bgAudio.play().catch(() => {}); },
       };
     }
