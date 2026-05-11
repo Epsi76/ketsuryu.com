@@ -31,6 +31,14 @@
       will-change: transform, opacity;
     }
     #bg-video.loaded { opacity: 0.45; }
+    /* Keep the moon (right side of the frame) on screen when the viewport
+       narrows past landscape — slides the crop window toward the right. */
+    @media (max-aspect-ratio: 1/1) {
+      #bg-video { object-position: 65% center; }
+    }
+    @media (max-aspect-ratio: 3/5) {
+      #bg-video { object-position: 80% center; }
+    }
     #fs-btn {
       position: fixed;
       right: 14px;
@@ -168,8 +176,19 @@
     // ---------- Background video: fade-in + mouse-driven parallax ----------
     const bgVideo = document.getElementById('bg-video');
     const revealVideo = () => bgVideo.classList.add('loaded');
-    bgVideo.addEventListener('playing', revealVideo, { once: true });
-    bgVideo.addEventListener('loadeddata', revealVideo, { once: true });
+    // Reveal as soon as we have any frame data; cover the case where the
+    // event already fired before this module script ran (mobile, preload).
+    if (bgVideo.readyState >= 2) {
+      revealVideo();
+    } else {
+      bgVideo.addEventListener('loadeddata', revealVideo, { once: true });
+      bgVideo.addEventListener('canplay',    revealVideo, { once: true });
+    }
+    // Belt-and-braces: if media events never fire (rare mobile cases),
+    // still trigger the fade so we don't sit at opacity 0 forever.
+    setTimeout(revealVideo, 800);
+    // Some mobile browsers gate autoplay even with muted+playsinline.
+    bgVideo.play().catch(() => {});
 
     // ---------- Petal geometry (Bezier shape) ----------
     const petalShape = new THREE.Shape();
@@ -212,7 +231,7 @@
     const layers = [
       { factor: 1.0,  count: 40,  fall: [0.8, 1.4], size: [0.7, 1.2],  opacity: 0.55, zRange: [-30, -18], blurred: true }, // far
       { factor: 2.6,  count: 50,  fall: [1.1, 1.9], size: [0.9, 1.4],  opacity: 0.85, zRange: [-15,  -3] }, // mid
-      { factor: 5.8,  count: 35,  fall: [1.6, 2.6], size: [1.2, 1.9],  opacity: 1.00, zRange: [  0,  10] }, // near
+      { factor: 5.8,  count: 40,  fall: [1.6, 2.6], size: [1.2, 1.9],  opacity: 1.00, zRange: [  0,  10] }, // near
     ];
 
     const COLOR_LIGHT = new THREE.Color(0xffd1de);
