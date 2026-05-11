@@ -613,13 +613,18 @@
     auPrev.addEventListener('click', (e) => { e.stopPropagation(); prevTrack(true); });
     auNext.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(true); });
 
-    // Near-automatic: kick playback off on the first interaction anywhere
-    // (browsers block audio autoplay until a user gesture).
-    addEventListener('pointerdown', (e) => {
-      if (audioStarted || !playlist.length || e.target.closest('#audio-ctrl')) return;
+    // Near-automatic: start playback on the very first user interaction anywhere —
+    // pointer, key, wheel or touch. (Browsers block audio autoplay until a real user
+    // gesture; synthetic clicks don't count — this is the widest net we can cast.)
+    const KICK_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+    const kickoffAudio = (e) => {
+      if (audioStarted || !playlist.length) return;
+      if (e && e.target && e.target.closest && e.target.closest('#audio-ctrl')) return;  // the controls handle their own clicks
       markStarted();
       bgAudio.play().catch(() => {});
-    });
+      KICK_EVENTS.forEach((t) => removeEventListener(t, kickoffAudio));
+    };
+    KICK_EVENTS.forEach((t) => addEventListener(t, kickoffAudio, { passive: true }));
 
     // Reveal the audio controls only in the bottom-left 30% zone (fullscreen only)
     addEventListener('pointermove', (e) => {
