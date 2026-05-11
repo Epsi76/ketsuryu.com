@@ -372,8 +372,8 @@
       // Animate the starry sky: twinkle + celestial drift + very subtle parallax
       starMat.uniforms.uTime.value = time;
       sky.rotateOnAxis(SKY_AXIS, SKY_ROT_SPEED * dt);
-      skyParallax.position.x = -mouse.x * 0.35;
-      skyParallax.position.y = -mouse.y * 0.28;
+      skyParallax.position.x = -mouse.x * 0.08;
+      skyParallax.position.y = -mouse.y * 0.06;
 
       // Parallax: shift each layer opposite to the mouse, deeper = subtler
       for (const layer of layers) {
