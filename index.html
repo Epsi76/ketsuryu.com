@@ -1158,5 +1158,13 @@
     }
     quoteLoop();
   </script>
+  <script>
+    // Service worker → rend le site installable comme application + cache hors-ligne.
+    if ('serviceWorker' in navigator) {
+      addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

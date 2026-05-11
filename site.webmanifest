@@ -1,13 +1,21 @@
 {
-  "name": "KetsuRyu",
+  "id": "/",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "fr",
+  "dir": "ltr",
+  "name": "KetsuRyu — Le calme qui aiguise l'esprit",
   "short_name": "KetsuRyu",
-  "icons": [
-    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
-    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
-  ],
+  "description": "Une fenêtre de calme pour la concentration profonde et la détente : pétales de sakura, crépuscule paisible, ambiance sonore et sagesses d'Asie.",
+  "categories": ["lifestyle", "productivity"],
+  "display": "standalone",
+  "orientation": "any",
   "theme_color": "#0b0b0d",
   "background_color": "#000000",
-  "display": "standalone",
-  "start_url": "/"
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
 }
