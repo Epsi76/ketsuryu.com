@@ -46,7 +46,7 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      width: min(82vw, 720px);
+      width: min(94vw, 1400px);
       text-align: center;
       color: rgba(255, 240, 245, 0.93);
       font-family: 'Georgia', 'Hiragino Mincho ProN', 'Yu Mincho', 'Times New Roman', serif;
@@ -503,7 +503,7 @@
       depthWrite: false,
     }));
     moonDisk.position.copy(MOON_POS);
-    moonDisk.scale.set(8.5, 8.5, 1);
+    moonDisk.scale.set(7, 7, 1);
     moonDisk.renderOrder = 1;
     sky.add(moonDisk);
 
@@ -514,7 +514,7 @@
       blending: THREE.AdditiveBlending,
     }));
     moonGlow.position.copy(MOON_POS);
-    moonGlow.scale.set(17, 17, 1);
+    moonGlow.scale.set(13.5, 13.5, 1);
     moonGlow.renderOrder = 2;
     sky.add(moonGlow);
 
@@ -525,7 +525,7 @@
       blending: THREE.AdditiveBlending,
     }));
     moonAura.position.copy(MOON_POS);
-    moonAura.scale.set(40, 40, 1);
+    moonAura.scale.set(26, 26, 1);
     moonAura.renderOrder = 3;
     sky.add(moonAura);
 
