@@ -620,10 +620,10 @@
           float lsPresent = step(0.85, lsR);
           vec2  lsP   = vec2(0.20 + hash(lsIp + 17.3) * 0.60,
                              0.20 + hash(lsIp + 31.7) * 0.60);
-          float lsSize = 0.018 + hash(lsIp + 73.1) * 0.010;          // even tinier than before
+          float lsSize = 0.010 + hash(lsIp + 73.1) * 0.005;          // very tiny core
           float lsD    = length(lsFp - lsP);
           float lsCore = smoothstep(lsSize, 0.0, lsD);
-          float lsHalo = smoothstep(lsSize * 5.5, 0.0, lsD) * 0.30;  // soft halo glow
+          float lsHalo = smoothstep(lsSize * 3.2, 0.0, lsD) * 0.22;  // tighter, dimmer halo
           float lsShape = lsCore + lsHalo;
           float lsTw   = 0.35 + 0.65 * sin(uTime * (0.7 + hash(lsIp + 99.3) * 1.6)
                                            + hash(lsIp + 47.5) * 6.28318);
