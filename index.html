@@ -603,9 +603,21 @@
           col += vec3(1.00, 0.93, 0.78) * stripe * 0.65;
           col += vec3(1.00, 0.96, 0.85) * glim;
 
-          // Star reflections: very sparse pinprick sparkles
-          vec2 sp = vec2(vWorld.x * 1.2 + uTime * 0.025, vWorld.y * 2.6);
-          float spark = pow(vnoise(sp), 90.0) * 2.6;
+          // Star reflections: cellular tiny dots (no streaks, each twinkles independently)
+          vec2 cellSize = vec2(3.0, 1.6);
+          vec2 sp = vWorld.xy / cellSize + vec2(uTime * 0.012, 0.0);
+          vec2 ip = floor(sp);
+          vec2 fp = fract(sp);
+          float r       = hash(ip);
+          float present = step(0.86, r);                                   // ~14% of cells host a star
+          vec2  starPos = vec2(0.20 + hash(ip + 17.3) * 0.60,
+                               0.20 + hash(ip + 31.7) * 0.60);
+          float starSize = 0.040 + hash(ip + 73.1) * 0.022;                // very small disks
+          float d        = length(fp - starPos);
+          float star     = smoothstep(starSize, 0.0, d);
+          float twinkle  = 0.35 + 0.65 * sin(uTime * (0.7 + hash(ip + 99.3) * 1.6)
+                                             + hash(ip + 47.5) * 6.28318);
+          float spark = star * present * twinkle * 1.25;
           spark *= smoothstep(0.0, 0.85, vUv.y);
           col += vec3(0.86, 0.92, 1.0) * spark;
 
