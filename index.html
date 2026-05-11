@@ -529,6 +529,87 @@
     moonAura.renderOrder = 3;
     sky.add(moonAura);
 
+    // ---------- Lake on the lower 30% of the view (reflects moon + stars) ----------
+    const waterMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime:  { value: 0 },
+        uMoonX: { value: MOON_POS.x },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vWorld;
+        void main() {
+          vUv = uv;
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorld = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uMoonX;
+        varying vec2 vUv;
+        varying vec3 vWorld;
+
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+        float vnoise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+                     mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+        }
+
+        void main() {
+          // Vertical gradient: nearly black at depth, slightly blueish near the surface
+          vec3 deep    = vec3(0.004, 0.009, 0.026);
+          vec3 shallow = vec3(0.020, 0.032, 0.068);
+          vec3 col = mix(deep, shallow, pow(vUv.y, 0.7));
+
+          // Multi-scale ripple shimmer (slow, layered noise)
+          vec2 wp = vWorld.xy * vec2(0.4, 1.6);
+          float w1 = vnoise(wp        + vec2( uTime * 0.10, 0.0));
+          float w2 = vnoise(wp * 2.4  + vec2( 0.0,  uTime * 0.16));
+          float w3 = vnoise(wp * 5.0  + vec2(-uTime * 0.04, uTime * 0.06));
+          float shimmer = w1 * 0.5 + w2 * 0.3 + w3 * 0.2;
+          col += vec3(0.022, 0.032, 0.058) * shimmer;
+
+          // Moonpath: bright wavering stripe under the moon
+          float wave = sin(vWorld.y * 1.4 + uTime * 0.6) * 0.55
+                     + sin(vWorld.y * 3.8 + uTime * 1.1) * 0.22;
+          float dx = abs((vWorld.x - uMoonX) + wave);
+          float stripeWidth = 1.0 + (1.0 - vUv.y) * 5.5;        // wider further from surface
+          float stripe = smoothstep(stripeWidth, 0.0, dx);
+          stripe *= mix(0.15, 1.0, pow(vUv.y, 1.4));            // brighter near surface
+          float breakup = 0.45 + 0.55 * sin(vWorld.y * 2.4 + uTime * 0.95 + shimmer * 6.0);
+          stripe *= breakup;
+          col += vec3(1.0, 0.93, 0.78) * stripe * 0.70;
+
+          // Star sparkles: sparse high-frequency glints, mostly near surface
+          vec2 sp = vec2(vWorld.x * 0.6 + uTime * 0.03,
+                         vWorld.y * 1.6 + sin(uTime * 0.4) * 0.4);
+          float sparkleN = vnoise(sp);
+          float sparkle  = pow(sparkleN, 24.0);
+          sparkle *= smoothstep(0.0, 0.75, vUv.y);
+          col += vec3(0.80, 0.88, 1.0) * sparkle * 1.6;
+
+          // Subtle horizon-line glow right at the top edge
+          float surface = smoothstep(0.92, 1.0, vUv.y);
+          col += vec3(0.07, 0.10, 0.16) * surface;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(220, 18), waterMat);
+    water.position.set(0, -23, -50);
+    skyParallax.add(water);  // gets gentle parallax but does NOT rotate with the celestial group
+
+    const _moonWorld = new THREE.Vector3();
+
     // Celestial drift: slow rotation around a slightly tilted axis (≈ Earth's polar view)
     const SKY_AXIS = new THREE.Vector3(0.18, 1.0, 0.05).normalize();
     const SKY_ROT_SPEED = 0.0009;  // rad/s — extremely subtle
@@ -567,6 +648,11 @@
       sky.rotateOnAxis(SKY_AXIS, SKY_ROT_SPEED * dt);
       skyParallax.position.x = -mouse.x * 0.08;
       skyParallax.position.y = -mouse.y * 0.06;
+
+      // Animate the lake; moonpath tracks the moon's current world x
+      moonDisk.getWorldPosition(_moonWorld);
+      waterMat.uniforms.uTime.value  = time;
+      waterMat.uniforms.uMoonX.value = _moonWorld.x;
 
       // Parallax: shift each layer opposite to the mouse, deeper = subtler
       for (const layer of layers) {
