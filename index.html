@@ -247,6 +247,99 @@
       layer.state = state;
     }
 
+    // ---------- Starry sky + glowing moon (rendered on the back canvas only) ----------
+    const skyParallax = new THREE.Group();
+    scene.add(skyParallax);
+    const sky = new THREE.Group();
+    skyParallax.add(sky);
+
+    // Twinkling star field (~upper 60% of the view)
+    const STAR_COUNT = 620;
+    const sPos = new Float32Array(STAR_COUNT * 3);
+    const sSize = new Float32Array(STAR_COUNT);
+    const sPhase = new Float32Array(STAR_COUNT);
+    const sSpeed = new Float32Array(STAR_COUNT);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      sPos[3*i + 0] = (Math.random() - 0.5) * 240;
+      sPos[3*i + 1] = -5 + Math.random() * 42;            // keeps stars in upper region
+      sPos[3*i + 2] = -55 - Math.random() * 28;
+      sSize[i]  = 0.25 + Math.random() * Math.random() * 1.8;  // skew toward small
+      sPhase[i] = Math.random() * Math.PI * 2;
+      sSpeed[i] = 0.5 + Math.random() * 1.6;
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+    starGeo.setAttribute('size',     new THREE.BufferAttribute(sSize, 1));
+    starGeo.setAttribute('phase',    new THREE.BufferAttribute(sPhase, 1));
+    starGeo.setAttribute('speed',    new THREE.BufferAttribute(sSpeed, 1));
+
+    const starMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        attribute float size;
+        attribute float phase;
+        attribute float speed;
+        uniform float uTime;
+        varying float vAlpha;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float tw = 0.5 + 0.5 * sin(uTime * speed + phase);
+          vAlpha = 0.35 + 0.65 * tw;
+          gl_PointSize = size * (340.0 / -mv.z) * (0.7 + 0.4 * tw);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          vec2 c = gl_PointCoord - 0.5;
+          float d = length(c);
+          if (d > 0.5) discard;
+          float core = smoothstep(0.5, 0.0, d);
+          gl_FragColor = vec4(vec3(0.95, 0.97, 1.0), core * vAlpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const starField = new THREE.Points(starGeo, starMat);
+    sky.add(starField);
+
+    // Moon: canvas-painted radial gradient sprite with additive glow
+    function makeMoonTexture() {
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      grad.addColorStop(0.00, 'rgba(255, 250, 232, 1.00)');
+      grad.addColorStop(0.16, 'rgba(255, 246, 222, 0.95)');
+      grad.addColorStop(0.26, 'rgba(255, 234, 202, 0.55)');
+      grad.addColorStop(0.45, 'rgba(255, 222, 198, 0.20)');
+      grad.addColorStop(0.70, 'rgba(255, 220, 195, 0.07)');
+      grad.addColorStop(1.00, 'rgba(255, 220, 195, 0.00)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      return tex;
+    }
+    const moonMat = new THREE.SpriteMaterial({
+      map: makeMoonTexture(),
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const moon = new THREE.Sprite(moonMat);
+    moon.position.set(16, 14, -52);
+    moon.scale.set(13, 13, 1);
+    sky.add(moon);
+
+    // Celestial drift: slow rotation around a slightly tilted axis (≈ Earth's polar view)
+    const SKY_AXIS = new THREE.Vector3(0.18, 1.0, 0.05).normalize();
+    const SKY_ROT_SPEED = 0.0009;  // rad/s — extremely subtle
+
     // ---------- Mouse + parallax ----------
     const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
     addEventListener('pointermove', (e) => {
@@ -275,6 +368,12 @@
       // Smooth mouse
       mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 4);
       mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 4);
+
+      // Animate the starry sky: twinkle + celestial drift + very subtle parallax
+      starMat.uniforms.uTime.value = time;
+      sky.rotateOnAxis(SKY_AXIS, SKY_ROT_SPEED * dt);
+      skyParallax.position.x = -mouse.x * 0.35;
+      skyParallax.position.y = -mouse.y * 0.28;
 
       // Parallax: shift each layer opposite to the mouse, deeper = subtler
       for (const layer of layers) {
@@ -310,13 +409,15 @@
       camera.position.y = mouse.y * 0.8;
       camera.lookAt(0, 0, 0);
 
-      // Back pass: far + mid (drawn behind the quote overlay)
+      // Back pass: sky + far + mid (drawn behind the quote overlay)
+      skyParallax.visible = true;
       layers[0].group.visible = true;
       layers[1].group.visible = true;
       layers[2].group.visible = false;
       rendererBack.render(scene, camera);
 
       // Front pass: near only (drawn in front of the quote overlay)
+      skyParallax.visible = false;
       layers[0].group.visible = false;
       layers[1].group.visible = false;
       layers[2].group.visible = true;
