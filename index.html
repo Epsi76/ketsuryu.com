@@ -45,12 +45,10 @@
     @media (max-aspect-ratio: 3/5) {
       #bg-video { object-position: 80% center; }
     }
-    @keyframes corner-in { from { opacity: 0; } }
     #fs-btn {
       position: fixed;
       right: 14px;
       bottom: 14px;
-      animation: corner-in 5s ease;
       width: 36px;
       height: 36px;
       display: flex;
@@ -75,6 +73,63 @@
       outline: none;
     }
     #fs-btn svg { display: block; }
+
+    /* Minimal audio controls — mirror of #fs-btn, anchored bottom-left */
+    #audio-ctrl {
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      display: flex;
+      gap: 6px;
+      opacity: 0.45;
+      transition: opacity 0.25s ease;
+      z-index: 10;
+    }
+    #audio-ctrl:hover, #audio-ctrl:focus-within { opacity: 1; }
+    #audio-ctrl button {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.35);
+      color: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    #audio-ctrl button:hover, #audio-ctrl button:focus-visible {
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      outline: none;
+    }
+    #audio-ctrl svg { display: block; fill: currentColor; }
+    /* Gentle "there's music" hint on the play button until the first interaction */
+    #audio-ctrl.hint { opacity: 0.6; }
+    #audio-ctrl.hint #au-toggle { animation: au-pulse 2.4s ease-in-out infinite; }
+    @keyframes au-pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(255, 255, 255, 0.28); }
+      70%  { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0   rgba(255, 255, 255, 0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #audio-ctrl.hint #au-toggle { animation: none; }
+    }
+    body.is-fs #audio-ctrl {
+      opacity: 0;
+      pointer-events: none;
+    }
+    body.is-fs #audio-ctrl.reveal {
+      opacity: 0.85;
+      pointer-events: auto;
+    }
+    body.is-fs #audio-ctrl.reveal:hover {
+      opacity: 1;
+    }
 
     #quote {
       position: fixed;
@@ -125,24 +180,6 @@
     body.is-fs #fs-btn.reveal:hover {
       opacity: 1;
     }
-
-    #spotify-embed {
-      position: fixed;
-      left: 14px;
-      bottom: 14px;
-      width: min(420px, calc(100vw - 28px));
-      height: 152px;
-      border: 0;
-      border-radius: 12px;
-      z-index: 10;
-      opacity: 0.85;
-      transition: opacity 0.25s ease;
-      animation: corner-in 5s ease;
-    }
-    #spotify-embed:hover { opacity: 1; }
-    /* Hide in fullscreen, mirror the fs-btn pattern */
-    body.is-fs #spotify-embed { opacity: 0; pointer-events: none; }
-    body.is-fs #spotify-embed.reveal { opacity: 0.9; pointer-events: auto; }
   </style>
 </head>
 <body>
@@ -155,18 +192,24 @@
     <span class="author"></span>
   </div>
 
-  <iframe id="spotify-embed"
-          data-testid="embed-iframe"
-          src="https://open.spotify.com/embed/playlist/4GwMcRDTu54cOwmcKq58HR?utm_source=generator&theme=0"
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          allowfullscreen
-          loading="lazy"></iframe>
-
   <button id="fs-btn" type="button" aria-label="Plein écran" title="Plein écran (double-clic ou Échap pour quitter)">
     <svg id="fs-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
     </svg>
   </button>
+
+  <div id="audio-ctrl">
+    <button id="au-prev" type="button" aria-label="Piste précédente" title="Piste précédente">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5.4" y="6" width="2.4" height="12" rx="0.6"/><path d="M20 6.3 L9.4 12 L20 17.7 Z"/></svg>
+    </button>
+    <button id="au-toggle" type="button" aria-label="Lecture" title="Lecture / Pause">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 5 L20 12 L7 19 Z"/></svg>
+    </button>
+    <button id="au-next" type="button" aria-label="Piste suivante" title="Piste suivante">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6.3 L14.6 12 L4 17.7 Z"/><rect x="16.2" y="6" width="2.4" height="12" rx="0.6"/></svg>
+    </button>
+  </div>
+  <audio id="bg-audio" preload="auto"></audio>
 
   <script type="importmap">
   {
@@ -440,7 +483,7 @@
       toggleFullscreen();
     });
     addEventListener('dblclick', (e) => {
-      if (e.target.closest('#fs-btn')) return;
+      if (e.target.closest('#fs-btn') || e.target.closest('#audio-ctrl')) return;
       toggleFullscreen();
     });
     document.addEventListener('fullscreenchange', () => {
@@ -451,18 +494,119 @@
       if (!isFs) fsBtn.classList.remove('reveal');
     });
 
-    // Reveal corner widgets only when the cursor is in their respective 30% zone (fullscreen only)
-    const spotifyEmbed = document.getElementById('spotify-embed');
+    // Reveal the FS button only when the cursor is in the bottom-right 30% zone (fullscreen only)
     addEventListener('pointermove', (e) => {
       if (!document.body.classList.contains('is-fs')) return;
-      const bottom = e.clientY > innerHeight * 0.7;
-      fsBtn.classList.toggle('reveal',        bottom && e.clientX > innerWidth * 0.7);
-      spotifyEmbed.classList.toggle('reveal', bottom && e.clientX < innerWidth * 0.3);
+      const inZone = e.clientX > innerWidth * 0.7 && e.clientY > innerHeight * 0.7;
+      fsBtn.classList.toggle('reveal', inZone);
     }, { passive: true });
-    addEventListener('pointerleave', () => {
-      fsBtn.classList.remove('reveal');
-      spotifyEmbed.classList.remove('reveal');
+    addEventListener('pointerleave', () => fsBtn.classList.remove('reveal'));
+
+    // ---------- Background music: auto-discovered playlist, minimal controls ----------
+    const bgAudio   = document.getElementById('bg-audio');
+    const audioCtrl = document.getElementById('audio-ctrl');
+    const auToggle  = document.getElementById('au-toggle');
+    const auPrev    = document.getElementById('au-prev');
+    const auNext    = document.getElementById('au-next');
+    const ICON_PLAY  = '<path d="M7 5 L20 12 L7 19 Z"/>';
+    const ICON_PAUSE = '<rect x="6.5" y="5" width="4" height="14" rx="0.8"/><rect x="13.5" y="5" width="4" height="14" rx="0.8"/>';
+
+    let playlist = [];      // playlist[0] always plays first; the rest shuffle
+    let curIdx = -1;
+    const history = [];     // previously played indices, for the ⏮ button
+    let audioStarted = false;
+    function markStarted() { audioStarted = true; audioCtrl.classList.remove('hint'); }
+
+    // Discover the .mp3 files in music/ — first via a directory listing
+    // (autoindex / `python -m http.server`), then by probing music/1.mp3,
+    // music/2.mp3, … so it also works on hosts without directory listing.
+    async function discoverPlaylist() {
+      try {
+        const res = await fetch('music/', { cache: 'no-store' });
+        if (res.ok) {
+          const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+          const files = [...doc.querySelectorAll('a[href]')]
+            .map(a => decodeURIComponent(a.getAttribute('href').split('/').pop().split('?')[0].split('#')[0]))
+            .filter(n => /\.mp3$/i.test(n));
+          if (files.length) {
+            files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+            return files.map(n => 'music/' + n);
+          }
+        }
+      } catch (_) { /* fall through to probing */ }
+      const found = [];
+      for (let i = 1; i <= 50; i++) {
+        const url = `music/${i}.mp3`;
+        try {
+          const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+          if (!r.ok) break;
+          found.push(url);
+        } catch (_) { break; }
+      }
+      return found;
+    }
+
+    function syncToggle() {
+      const playing = !bgAudio.paused && !bgAudio.ended;
+      auToggle.querySelector('svg').innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+      auToggle.setAttribute('aria-label', playing ? 'Pause' : 'Lecture');
+    }
+    function playIndex(i, autoplay) {
+      if (!playlist.length) return;
+      curIdx = ((i % playlist.length) + playlist.length) % playlist.length;
+      bgAudio.src = playlist[curIdx];
+      if (autoplay) { markStarted(); bgAudio.play().catch(() => {}); }
+    }
+    function randomIndex() {
+      if (playlist.length <= 1) return 0;
+      let i; do { i = (Math.random() * playlist.length) | 0; } while (i === curIdx);
+      return i;
+    }
+    function nextTrack(autoplay) {
+      if (curIdx >= 0) { history.push(curIdx); if (history.length > 100) history.shift(); }
+      playIndex(randomIndex(), autoplay);
+    }
+    function prevTrack(autoplay) {
+      playIndex(history.length ? history.pop() : randomIndex(), autoplay);
+    }
+
+    bgAudio.addEventListener('play',  syncToggle);
+    bgAudio.addEventListener('pause', syncToggle);
+    bgAudio.addEventListener('ended', () => nextTrack(true));
+
+    auToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!playlist.length) return;
+      markStarted();
+      if (bgAudio.paused) bgAudio.play().catch(() => {}); else bgAudio.pause();
     });
+    auPrev.addEventListener('click', (e) => { e.stopPropagation(); prevTrack(true); });
+    auNext.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(true); });
+
+    // Near-automatic: kick playback off on the first interaction anywhere
+    // (browsers block audio autoplay until a user gesture).
+    addEventListener('pointerdown', (e) => {
+      if (audioStarted || !playlist.length || e.target.closest('#audio-ctrl')) return;
+      markStarted();
+      bgAudio.play().catch(() => {});
+    });
+
+    // Reveal the audio controls only in the bottom-left 30% zone (fullscreen only)
+    addEventListener('pointermove', (e) => {
+      if (!document.body.classList.contains('is-fs')) return;
+      const inZone = e.clientX < innerWidth * 0.3 && e.clientY > innerHeight * 0.7;
+      audioCtrl.classList.toggle('reveal', inZone);
+    }, { passive: true });
+    addEventListener('pointerleave', () => audioCtrl.classList.remove('reveal'));
+
+    (async () => {
+      playlist = await discoverPlaylist();
+      if (!playlist.length) { audioCtrl.style.display = 'none'; return; }
+      bgAudio.loop = playlist.length === 1;   // single track → seamless native loop
+      playIndex(0, false);   // load the first track; playback starts on first gesture
+      syncToggle();
+      if (!audioStarted) audioCtrl.classList.add('hint');
+    })();
 
     // ---------- Random Asian wisdom quotes (fade-in + un-blur, hold, fade-out, gap, loop) ----------
     const QUOTES = [
