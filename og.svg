@@ -31,7 +31,6 @@
     <use href="#petal" transform="translate(108 358) rotate(42) scale(1.0)"   opacity="0.97"/>
     <use href="#petal" transform="translate(298 472) rotate(-26) scale(1.28)" opacity="1"/>
     <use href="#petal" transform="translate(468 302) rotate(72) scale(0.8)"   opacity="0.92" filter="url(#b1)"/>
-    <use href="#petal" transform="translate(560 562) rotate(11) scale(1.4)"   opacity="1"/>
     <use href="#petal" transform="translate(706 384) rotate(-56) scale(0.92)" opacity="0.96"/>
     <use href="#petal" transform="translate(910 248) rotate(31) scale(0.84)"  opacity="0.94"/>
     <use href="#petal" transform="translate(1034 472) rotate(-16) scale(1.05)" opacity="0.96"/>
