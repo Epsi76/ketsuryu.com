@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#191338"/>
+      <stop offset="0.40" stop-color="#412a5c"/>
+      <stop offset="0.66" stop-color="#8c4a62"/>
+      <stop offset="0.84" stop-color="#cb7a59"/>
+      <stop offset="1"    stop-color="#341f3a"/>
+    </linearGradient>
+    <radialGradient id="fog" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"   stop-color="#f4cda2" stop-opacity="0.42"/>
+      <stop offset="0.6" stop-color="#e9b58c" stop-opacity="0.16"/>
+      <stop offset="1"   stop-color="#e9b58c" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="moonglow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"    stop-color="#fdf6e3" stop-opacity="0.55"/>
+      <stop offset="0.32" stop-color="#fbe9c8" stop-opacity="0.22"/>
+      <stop offset="1"    stop-color="#fbe9c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="moon" cx="0.4" cy="0.38" r="0.65">
+      <stop offset="0"    stop-color="#fdfaf0"/>
+      <stop offset="0.7"  stop-color="#efe5cd"/>
+      <stop offset="1"    stop-color="#d6c8ab"/>
+    </radialGradient>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#120c20" stop-opacity="0"/>
+      <stop offset="0.6" stop-color="#120c20" stop-opacity="0.32"/>
+      <stop offset="1"   stop-color="#0c0818" stop-opacity="0.66"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.42" r="0.78">
+      <stop offset="0"   stop-color="#000" stop-opacity="0"/>
+      <stop offset="0.68" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1"   stop-color="#000" stop-opacity="0.5"/>
+    </radialGradient>
+    <linearGradient id="petalg" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0"   stop-color="#ffe8f2"/>
+      <stop offset="0.5" stop-color="#f7afcc"/>
+      <stop offset="1"   stop-color="#e3709b"/>
+    </linearGradient>
+    <path id="petal" d="M0 22C10 19 18 -2 15 -15 13 -20 7 -22 0 -22 -7 -22 -13 -20 -15 -15 -18 -2 -10 19 0 22Z"/>
+    <filter id="b1" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="b2" x="-160%" y="-160%" width="420%" height="420%"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="txtshadow" x="-30%" y="-30%" width="160%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.55"/></filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#sky)"/>
+
+  <!-- horizon fog -->
+  <ellipse cx="600" cy="420" rx="900" ry="180" fill="url(#fog)"/>
+
+  <!-- far petals (small, blurred, faint) -->
+  <g fill="url(#petalg)">
+    <use href="#petal" transform="translate(150 96) rotate(38) scale(0.5)"  opacity="0.40" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(404 58) rotate(-24) scale(0.42)" opacity="0.34" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(690 120) rotate(63) scale(0.55)" opacity="0.40" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(1018 72) rotate(14) scale(0.46)" opacity="0.34" filter="url(#b2)"/>
+    <use href="#petal" transform="translate(540 214) rotate(-44) scale(0.62)" opacity="0.46" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(266 252) rotate(27) scale(0.6)"  opacity="0.42" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(862 240) rotate(-12) scale(0.5)" opacity="0.38" filter="url(#b1)"/>
+  </g>
+
+  <!-- moon, upper-right -->
+  <circle cx="932" cy="196" r="200" fill="url(#moonglow)"/>
+  <circle cx="932" cy="196" r="74"  fill="url(#moon)"/>
+
+  <!-- mid + foreground petals (sharp) -->
+  <g fill="url(#petalg)">
+    <use href="#petal" transform="translate(120 384) rotate(42) scale(1.05)"  opacity="0.95"/>
+    <use href="#petal" transform="translate(322 470) rotate(-26) scale(1.32)" opacity="1"/>
+    <use href="#petal" transform="translate(508 322) rotate(72) scale(0.86)"  opacity="0.9" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(636 548) rotate(11) scale(1.5)"   opacity="1"/>
+    <use href="#petal" transform="translate(772 392) rotate(-56) scale(0.96)" opacity="0.96"/>
+    <use href="#petal" transform="translate(900 524) rotate(31) scale(1.22)"  opacity="1"/>
+    <use href="#petal" transform="translate(1064 432) rotate(-16) scale(1.06)" opacity="0.96"/>
+    <use href="#petal" transform="translate(1146 286) rotate(52) scale(0.78)" opacity="0.88" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(52 552) rotate(-34) scale(0.92)"  opacity="0.93"/>
+    <use href="#petal" transform="translate(430 606) rotate(19) scale(0.7)"   opacity="0.85" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(244 410) rotate(58) scale(0.62)"  opacity="0.78" filter="url(#b1)"/>
+    <use href="#petal" transform="translate(1010 588) rotate(-48) scale(0.84)" opacity="0.9"/>
+  </g>
+
+  <!-- bottom scrim + vignette -->
+  <rect x="0" y="300" width="1200" height="330" fill="url(#scrim)"/>
+  <rect width="1200" height="630" fill="url(#vig)"/>
+
+  <!-- wordmark -->
+  <g filter="url(#txtshadow)">
+    <text x="66" y="534" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="74" font-style="italic" fill="#fff4f8" letter-spacing="1">KetsuRyu</text>
+    <text x="70" y="576" font-family="Noto Serif Display, Noto Serif, Georgia, serif" font-size="22" fill="#ffd6e2" letter-spacing="4.5">DEEP-WORK · DÉTENTE · SAGESSES D'ASIE</text>
+  </g>
+</svg>
